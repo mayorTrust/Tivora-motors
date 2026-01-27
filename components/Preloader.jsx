@@ -2,14 +2,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 
-interface PreloaderProps {
-  onComplete: () => void;
-}
-
-const Preloader: React.FC<PreloaderProps> = ({ onComplete }) => {
+const Preloader = ({ onComplete }) => {
   const [progress, setProgress] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const textRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef(null);
+  const textRef = useRef(null);
 
   useEffect(() => {
     // Simulate loading sequence

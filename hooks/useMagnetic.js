@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 
 export const useMagnetic = () => {
-  const magnetic = useRef<HTMLDivElement | null>(null);
+  const magnetic = useRef(null);
 
   useEffect(() => {
     if (!magnetic.current) return;
@@ -12,7 +12,7 @@ export const useMagnetic = () => {
     const xTo = gsap.quickTo(element, "x", { duration: 1, ease: "elastic.out(1, 0.3)" });
     const yTo = gsap.quickTo(element, "y", { duration: 1, ease: "elastic.out(1, 0.3)" });
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMouseMove = (e) => {
       const { clientX, clientY } = e;
       const { height, width, left, top } = element.getBoundingClientRect();
       const x = clientX - (left + width / 2);

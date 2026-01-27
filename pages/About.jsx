@@ -1,8 +1,9 @@
 
+
 import React from 'react';
 import { Target, Users, Award, ShieldCheck } from 'lucide-react';
 
-const About: React.FC = () => {
+const About = () => {
   return (
     <div className="pt-24 pb-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

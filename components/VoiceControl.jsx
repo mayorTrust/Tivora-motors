@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Mic, MicOff, Zap, Mic2, Navigation, Command, Search as SearchIcon, Sparkles, Globe, Cpu, Languages, Terminal, MessageSquare } from 'lucide-react';
@@ -17,30 +16,30 @@ const HINTS = [
   "Kaia, find a red car in the showroom"
 ];
 
-const VoiceControl: React.FC = () => {
+const VoiceControl = () => {
   const [isActive, setIsActive] = useState(false);
   const isActiveRef = useRef(false);
   const [volume, setVolume] = useState(0);
-  const [status, setStatus] = useState<'idle' | 'connecting' | 'listening' | 'speaking' | 'processing'>('idle');
+  const [status, setStatus] = useState('idle');
   const [showHints, setShowHints] = useState(true);
   const [currentHintIndex, setCurrentHintIndex] = useState(0);
   const [permissionError, setPermissionError] = useState(false);
-  const [lastCommand, setLastCommand] = useState<{text: string, icon: React.ReactNode} | null>(null);
+  const [lastCommand, setLastCommand] = useState(null);
 
   const navigate = useNavigate();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const modalRef = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef(null);
+  const modalRef = useRef(null);
+  const overlayRef = useRef(null);
 
   // Audio Refs
-  const inputContextRef = useRef<AudioContext | null>(null);
-  const outputContextRef = useRef<AudioContext | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const nextStartTimeRef = useRef<number>(0);
-  const sessionRef = useRef<Promise<any> | null>(null);
-  const hintIntervalRef = useRef<any>(null);
+  const inputContextRef = useRef(null);
+  const outputContextRef = useRef(null);
+  const processorRef = useRef(null);
+  const sourceRef = useRef(null);
+  const streamRef = useRef(null);
+  const nextStartTimeRef = useRef(0);
+  const sessionRef = useRef(null);
+  const hintIntervalRef = useRef(null);
 
   useEffect(() => {
     return () => {
@@ -51,7 +50,7 @@ const VoiceControl: React.FC = () => {
   useEffect(() => {
     if (permissionError && modalRef.current) {
       gsap.fromTo(overlayRef.current, { opacity: 0 }, { opacity: 1, duration: 0.3 });
-      gsap.fromTo(modalRef.current, 
+      gsap.fromTo(modalRef.current,
         { scale: 0.9, opacity: 0, y: 20 },
         { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: 'back.out(1.7)' }
       );
@@ -132,7 +131,7 @@ const VoiceControl: React.FC = () => {
         action: {
           type: Type.STRING,
           enum: [
-            'toggle_theme', 
+            'toggle_theme',
             'scroll_top', 'scroll_bottom', 'scroll_down', 'scroll_up',
             'open_dream_machine', 'open_quantum_analyst', 'open_theme_generator', 'open_motion_studio'
           ],
@@ -166,7 +165,7 @@ const VoiceControl: React.FC = () => {
     Identity & Persona: 
     - You are KAIA (Kinetic Artificial Intelligence Assistant). 
     - You are an incredibly sophisticated, articulate, and fiercely loyal AI OS, inspired by technical butlers.
-    - Your core personality is professional, precise, and highly intelligent.
+    - Your core personality is professional, precise, and highly intelligent. 
     
     Adaptive Linguistic Matrix (Authentic Accents):
     - You are a universal polyglot with deep mastery of ALL world languages and local dialects.
@@ -179,7 +178,7 @@ const VoiceControl: React.FC = () => {
 
     Role:
     - Curator and guardian of Trust Motors.
-    - Handle showroom navigation, inventory searches, and technical mobility research.
+    - Handle showroom navigation, inventory searches, and technical mobility research. 
     
     DATABASE:
     ${vehicleContext}
@@ -188,11 +187,11 @@ const VoiceControl: React.FC = () => {
     - Start with: "Kaia online. Adaptive Linguistic Matrix synchronized. Native accents active. How may I assist your Trust Motors experience today, sir?"
   `;
 
-  const performWebSearch = async (query: string) => {
+  const performWebSearch = async (query) => {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.5-flash',
         contents: `As KAIA, research this query and provide a sophisticated summary. Query: ${query}`,
         config: { tools: [{ googleSearch: {} }] },
       });
@@ -216,7 +215,7 @@ const VoiceControl: React.FC = () => {
       });
       streamRef.current = stream;
 
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
       inputContextRef.current = new AudioCtx({ sampleRate: 16000 });
       outputContextRef.current = new AudioCtx({ sampleRate: 24000 });
       
@@ -242,7 +241,7 @@ const VoiceControl: React.FC = () => {
             
             setTimeout(() => setLastCommand(null), 2500);
           },
-          onmessage: async (msg: any) => {
+          onmessage: async (msg) => {
             if (msg.toolCall) {
               setStatus('processing');
               await handleToolCalls(msg.toolCall, sessionPromise);
@@ -267,8 +266,8 @@ const VoiceControl: React.FC = () => {
     }
   };
 
-  const handleToolCalls = async (toolCall: any, sessionPromise: Promise<any>) => {
-    const functionResponses = await Promise.all(toolCall.functionCalls.map(async (fc: any) => {
+  const handleToolCalls = async (toolCall, sessionPromise) => {
+    const functionResponses = await Promise.all(toolCall.functionCalls.map(async (fc) => {
       const { name, args } = fc;
       let result = "Action confirmed, sir.";
 
@@ -311,13 +310,13 @@ const VoiceControl: React.FC = () => {
       return { id: fc.id, name: fc.name, response: { result: result } };
     }));
 
-    sessionPromise.then((session: any) => {
+    sessionPromise.then((session) => {
       session.sendToolResponse({ functionResponses });
     });
     setStatus('listening');
   };
 
-  const setupAudioInput = (sessionPromise: Promise<any>) => {
+  const setupAudioInput = (sessionPromise) => {
     const ctx = inputContextRef.current;
     if(!ctx || !streamRef.current) return;
     sourceRef.current = ctx.createMediaStreamSource(streamRef.current);
@@ -333,7 +332,7 @@ const VoiceControl: React.FC = () => {
       const bytes = new Uint8Array(int16.buffer);
       let binary = '';
       for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-      sessionPromise.then((session: any) => {
+      sessionPromise.then((session) => {
         session.sendRealtimeInput({ media: { mimeType: 'audio/pcm;rate=16000', data: btoa(binary) } });
       }).catch(() => {});
     };
@@ -341,7 +340,7 @@ const VoiceControl: React.FC = () => {
     processorRef.current.connect(ctx.destination);
   };
 
-  const playAudio = async (base64String: string) => {
+  const playAudio = async (base64String) => {
     const ctx = outputContextRef.current;
     if (!ctx) return;
     try {
@@ -378,7 +377,7 @@ const VoiceControl: React.FC = () => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    let animationId: number;
+    let animationId;
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (isActiveRef.current) {

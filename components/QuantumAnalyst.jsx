@@ -4,13 +4,13 @@ import { GoogleGenAI } from '@google/genai';
 import { BrainCircuit, Search, Loader2, X, ExternalLink, Activity } from 'lucide-react';
 import gsap from 'gsap';
 
-const QuantumAnalyst: React.FC = () => {
+const QuantumAnalyst = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [response, setResponse] = useState<string | null>(null);
-  const [sources, setSources] = useState<{ title: string; uri: string }[]>([]);
+  const [response, setResponse] = useState(null);
+  const [sources, setSources] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     const handleOpen = () => setIsOpen(true);
@@ -34,7 +34,7 @@ const QuantumAnalyst: React.FC = () => {
     setSources([]);
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const result = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: query,
@@ -47,7 +47,7 @@ const QuantumAnalyst: React.FC = () => {
       setResponse(result.text);
       const chunks = result.candidates?.[0]?.groundingMetadata?.groundingChunks;
       if (chunks) {
-        setSources(chunks.filter((c: any) => c.web).map((c: any) => ({ title: c.web.title, uri: c.web.uri })));
+        setSources(chunks.filter((c) => c.web).map((c) => ({ title: c.web.title, uri: c.web.uri })));
       }
     } catch (err) {
       setResponse("Intelligence system connection severed. Please retry uplink.");

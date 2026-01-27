@@ -1,6 +1,12 @@
-import { Category, Vehicle } from './types.ts';
+export const Category = {
+  CAR: 'Car',
+  BIKE: 'Bike',
+  BICYCLE: 'Bicycle',
+  SCOOTER: 'Scooter',
+  SKATEBOARD: 'Skateboard'
+};
 
-export const INITIAL_VEHICLES: Vehicle[] = [
+export const INITIAL_VEHICLES = [
   {
     id: '1',
     name: 'Ferrari Roma Spider',

@@ -2,14 +2,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronRight, Star, Shield, Zap, Award, Globe } from 'lucide-react';
-import { Vehicle } from '../types.ts';
-import VehicleCard from '../components/VehicleCard.tsx';
+import VehicleCard from '../components/VehicleCard';
 
-interface HomeProps {
-  featuredVehicles: Vehicle[];
-}
-
-const Home: React.FC<HomeProps> = ({ featuredVehicles }) => {
+const Home = ({ featuredVehicles }) => {
   return (
     <div className="w-full">
       {/* Hero Section */}

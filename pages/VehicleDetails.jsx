@@ -2,16 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft, MapPin, Calendar, Gauge, CheckCircle, MessageCircle, CreditCard, Share2 } from 'lucide-react';
-import { Vehicle } from '../types.ts';
-import { SkeletonDetails } from '../components/Loading.tsx';
-import PaymentAssistant from '../components/PaymentAssistant.tsx';
+import { SkeletonDetails } from '../components/Loading';
+import PaymentAssistant from '../components/PaymentAssistant';
 
-interface VehicleDetailsProps {
-  vehicles: Vehicle[];
-}
-
-const VehicleDetails: React.FC<VehicleDetailsProps> = ({ vehicles }) => {
-  const { id } = useParams<{ id: string }>();
+const VehicleDetails = ({ vehicles }) => {
+  const { id } = useParams();
   const vehicle = vehicles.find((v) => v.id === id);
   const [activeImage, setActiveImage] = useState(0);
   const [loading, setLoading] = useState(true);

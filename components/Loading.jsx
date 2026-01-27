@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 
-export const Spinner: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }) => {
+export const Spinner = ({ size = 'md' }) => {
   const sizes = {
     sm: 'w-5 h-5 border-2',
     md: 'w-8 h-8 border-3',
@@ -17,7 +17,7 @@ export const Spinner: React.FC<{ size?: 'sm' | 'md' | 'lg' }> = ({ size = 'md' }
   );
 };
 
-export const SkeletonCard: React.FC = () => {
+export const SkeletonCard = () => {
   return (
     <div className="glass-card rounded-2xl overflow-hidden h-[450px]">
       <div className="skeleton h-[220px] w-full"></div>
@@ -38,7 +38,7 @@ export const SkeletonCard: React.FC = () => {
   );
 };
 
-export const SkeletonDetails: React.FC = () => {
+export const SkeletonDetails = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
       <div className="skeleton h-6 w-32 rounded mb-8"></div>

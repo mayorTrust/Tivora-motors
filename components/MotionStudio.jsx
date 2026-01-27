@@ -3,16 +3,16 @@ import { GoogleGenAI } from '@google/genai';
 import { Film, Video, Loader2, X, Sparkles, Upload, Play, Key, AlertCircle } from 'lucide-react';
 import gsap from 'gsap';
 
-const MotionStudio: React.FC = () => {
+const MotionStudio = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
-  const [image, setImage] = useState<string | null>(null);
-  const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
+  const [image, setImage] = useState(null);
+  const [generatedVideo, setGeneratedVideo] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [status, setStatus] = useState('');
   const [needsApiKey, setNeedsApiKey] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const handleOpen = () => setIsOpen(true);
@@ -31,8 +31,8 @@ const MotionStudio: React.FC = () => {
 
   const checkApiKey = async () => {
       // Cast window to any to avoid conflict with global AIStudio type
-      const aistudio = (window as any).aistudio;
-      if (aistudio?.hasSelectedApiKey) {
+      const aistudio = window.aistudio;
+      if (aistudio && aistudio.hasSelectedApiKey) {
           const hasKey = await aistudio.hasSelectedApiKey();
           setNeedsApiKey(!hasKey);
       }
@@ -40,8 +40,8 @@ const MotionStudio: React.FC = () => {
 
   const handleSelectKey = async () => {
       // Cast window to any to avoid conflict with global AIStudio type
-      const aistudio = (window as any).aistudio;
-      if (aistudio?.openSelectKey) {
+      const aistudio = window.aistudio;
+      if (aistudio && aistudio.openSelectKey) {
           try {
               await aistudio.openSelectKey();
               // Assume success after dialog interaction to mitigate race condition
@@ -52,7 +52,7 @@ const MotionStudio: React.FC = () => {
       }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
@@ -61,7 +61,7 @@ const MotionStudio: React.FC = () => {
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImage(reader.result as string);
+        setImage(reader.result);
       };
       reader.readAsDataURL(file);
     }
@@ -80,7 +80,7 @@ const MotionStudio: React.FC = () => {
 
     try {
         // Just-in-time Key Check
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         
         let operation;
         
@@ -134,9 +134,9 @@ const MotionStudio: React.FC = () => {
             throw new Error("Generation completed but no video URI found.");
         }
 
-    } catch (err: any) {
+    } catch (err) {
         console.error(err);
-        if (err.message?.includes("Requested entity was not found") || err.message?.includes("403") || err.message?.includes("404")) {
+        if (err.message && (err.message.includes("Requested entity was not found") || err.message.includes("403") || err.message.includes("404"))) {
             setNeedsApiKey(true);
             setStatus("Authorization failed.");
         } else {

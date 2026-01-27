@@ -16,13 +16,6 @@ import {
 } from 'lucide-react';
 import gsap from 'gsap';
 
-interface PaymentAssistantProps {
-  vehicleName?: string;
-  price?: number;
-  isOpen: boolean;
-  onClose: () => void;
-}
-
 const PAYMENT_METHODS = [
   { id: 'bank', name: 'Bank Transfer', icon: <Banknote size={16} /> },
   { id: 'card', name: 'Debit/Credit Card', icon: <CreditCard size={16} /> },
@@ -31,16 +24,16 @@ const PAYMENT_METHODS = [
   { id: 'wallet', name: 'Mobile Wallet', icon: <Wallet size={16} /> },
 ];
 
-const PaymentAssistant: React.FC<PaymentAssistantProps> = ({ vehicleName, price, isOpen, onClose }) => {
-  const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
+const PaymentAssistant = ({ vehicleName, price, isOpen, onClose }) => {
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef(null);
+  const containerRef = useRef(null);
 
   const systemInstruction = `
     You are a secure payment assistant for TIVORA_RIDES. 
-    Your role is to help users choose, set up, and complete payments for the vehicle: ${vehicleName || 'a luxury vehicle'} priced at $${price?.toLocaleString() || 'market value'}.
+    Your role is to help users choose, set up, and complete payments for the vehicle: ${vehicleName || 'a luxury vehicle'} priced at $${price?.toLocaleString() || 'market value'}. 
     
     Supported methods:
     - Bank transfer
@@ -67,7 +60,7 @@ const PaymentAssistant: React.FC<PaymentAssistantProps> = ({ vehicleName, price,
         { 
           role: 'assistant', 
           content: `Welcome to the secure checkout for the **${vehicleName}**. I am your payment assistant. How would you like to handle the investment today? We support Bank Transfers, Cards, Crypto, and even high-value Gift Cards.` 
-        }
+        } 
       ]);
       
       if (containerRef.current) {
@@ -85,18 +78,18 @@ const PaymentAssistant: React.FC<PaymentAssistantProps> = ({ vehicleName, price,
     }
   }, [messages, isTyping]);
 
-  const handleSend = async (text: string) => {
-    if (!text.trim() || isTyping) return;
+  const handleSend = async (text) => {
+    if (!text.trim() || isTyping) return; 
     
-    const userMessage = { role: 'user' as const, content: text };
+    const userMessage = { role: 'user', content: text };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsTyping(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.5-flash',
         contents: [...messages, userMessage].map(m => ({
           role: m.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: m.content }]
@@ -156,7 +149,7 @@ const PaymentAssistant: React.FC<PaymentAssistantProps> = ({ vehicleName, price,
               key={idx} 
               className={`flex ${msg.role === 'assistant' ? 'justify-start' : 'justify-end'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
             >
-              <div className={`max-w-[85%] p-5 rounded-3xl text-sm leading-relaxed ${
+              <div className={`max-w-[85%] p-5 rounded-3xl text-sm leading-relaxed ${ 
                 msg.role === 'assistant' 
                 ? 'bg-foreground/5 text-foreground/80 border border-foreground/5 rounded-tl-none font-medium' 
                 : 'bg-accent text-background font-bold rounded-tr-none shadow-lg shadow-accent/20'

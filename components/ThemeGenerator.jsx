@@ -4,11 +4,11 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { Palette, Sparkles, Loader2, X, RefreshCw } from 'lucide-react';
 import gsap from 'gsap';
 
-const ThemeGenerator: React.FC = () => {
+const ThemeGenerator = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     const handleOpen = () => setIsOpen(true);
@@ -29,9 +29,9 @@ const ThemeGenerator: React.FC = () => {
     if (!prompt.trim()) return;
     setIsGenerating(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.5-flash',
         contents: `Generate a UI theme color palette for a car dealership webapp based on the following mood: "${prompt}". 
                    The background should be appropriate for the mood (dark or light). 
                    Text should contrast well. Accent should be vibrant.

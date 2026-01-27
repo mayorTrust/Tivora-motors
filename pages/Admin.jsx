@@ -1,19 +1,12 @@
 
 import React, { useState } from 'react';
 import { Plus, Trash2, Edit, Save, X, Eye, Package } from 'lucide-react';
-import { Vehicle, Category } from '../types.ts';
+import { Category } from '../constants';
 
-interface AdminProps {
-  vehicles: Vehicle[];
-  onAdd: (v: Vehicle) => void;
-  onUpdate: (v: Vehicle) => void;
-  onDelete: (id: string) => void;
-}
-
-const Admin: React.FC<AdminProps> = ({ vehicles, onAdd, onUpdate, onDelete }) => {
+const Admin = ({ vehicles, onAdd, onUpdate, onDelete }) => {
   const [isAdding, setIsAdding] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<Vehicle>>({});
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
 
   const resetForm = () => {
     setEditForm({
@@ -34,13 +27,13 @@ const Admin: React.FC<AdminProps> = ({ vehicles, onAdd, onUpdate, onDelete }) =>
 
   const handleSave = () => {
     if (editingId) {
-      onUpdate(editForm as Vehicle);
+      onUpdate(editForm);
       setEditingId(null);
     } else {
       const newVehicle = {
         ...editForm,
         id: Math.random().toString(36).substr(2, 9)
-      } as Vehicle;
+      };
       onAdd(newVehicle);
       setIsAdding(false);
     }
@@ -97,7 +90,7 @@ const Admin: React.FC<AdminProps> = ({ vehicles, onAdd, onUpdate, onDelete }) =>
               <label className="text-xs font-bold uppercase text-gray-500">Category</label>
               <select
                 value={editForm.category}
-                onChange={(e) => setEditForm({ ...editForm, category: e.target.value as Category })}
+                onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
                 className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 focus:outline-none focus:border-[#00f3ff] appearance-none"
               >
                 {Object.values(Category).map(cat => <option key={cat} value={cat} className="bg-[#111]">{cat}</option>)}

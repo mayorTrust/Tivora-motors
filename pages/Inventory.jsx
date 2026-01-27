@@ -2,19 +2,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { Vehicle, Category } from '../types.ts';
-import VehicleCard from '../components/VehicleCard.tsx';
-import { SkeletonCard } from '../components/Loading.tsx';
+import { Category } from '../constants';
+import VehicleCard from '../components/VehicleCard';
+import { SkeletonCard } from '../components/Loading';
 
-interface InventoryProps {
-  vehicles: Vehicle[];
-}
-
-const Inventory: React.FC<InventoryProps> = ({ vehicles }) => {
+const Inventory = ({ vehicles }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [priceRange, setPriceRange] = useState<number>(1000000);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [priceRange, setPriceRange] = useState(1000000);
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -47,7 +43,7 @@ const Inventory: React.FC<InventoryProps> = ({ vehicles }) => {
     });
   }, [vehicles, searchTerm, selectedCategory, priceRange]);
 
-  const updateCategory = (cat: string) => {
+  const updateCategory = (cat) => {
     setSelectedCategory(cat);
     // Update URL to reflect state change (optional, but good for shareability)
     if (cat === 'All') searchParams.delete('category');
@@ -57,7 +53,7 @@ const Inventory: React.FC<InventoryProps> = ({ vehicles }) => {
     if (showFilters) setShowFilters(false);
   };
 
-  const updateSearch = (term: string) => {
+  const updateSearch = (term) => {
     setSearchTerm(term);
     if (term) searchParams.set('search', term);
     else searchParams.delete('search');

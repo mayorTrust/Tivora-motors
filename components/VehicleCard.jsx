@@ -2,13 +2,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Eye, MapPin, Calendar, Gauge } from 'lucide-react';
-import { Vehicle } from '../types';
 
-interface VehicleCardProps {
-  vehicle: Vehicle;
-}
-
-const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle }) => {
+const VehicleCard = ({ vehicle }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
 
   return (

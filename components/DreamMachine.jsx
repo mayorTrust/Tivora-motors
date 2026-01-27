@@ -4,12 +4,12 @@ import { GoogleGenAI } from '@google/genai';
 import { Wand2, Image as ImageIcon, Loader2, X, Sparkles } from 'lucide-react';
 import gsap from 'gsap';
 
-const DreamMachine: React.FC = () => {
+const DreamMachine = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [generatedImage, setGeneratedImage] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     const handleOpen = () => setIsOpen(true);
@@ -29,7 +29,7 @@ const DreamMachine: React.FC = () => {
     setGeneratedImage(null);
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       // Using gemini-2.5-flash-image for generation (via generateContent per SDK guidelines for this model)
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
