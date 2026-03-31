@@ -40,7 +40,7 @@ const QuantumAnalyst = () => {
         contents: query,
         config: {
           tools: [{ googleSearch: {} }],
-          systemInstruction: "You are 'Tivora Intelligence', a futuristic vehicle market analyst. Provide concise, data-driven insights about cars, prices, and trends. Keep tone sleek and professional."
+          systemInstruction: "You are 'CIPHAR', a futuristic vehicle market analyst. Provide concise, data-driven insights about cars, prices, and trends. Keep tone sleek and professional."
         },
       });
 
