@@ -1,23 +1,26 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { Mic, MicOff, Zap, Mic2, Navigation, Command, Search as SearchIcon, Sparkles, Globe, Cpu, Languages, Terminal, MessageSquare } from 'lucide-react';
+import { Mic, MicOff, Zap, Mic2, Navigation, Command, Search as SearchIcon, Sparkles, Globe, Cpu, Languages, Terminal, MessageSquare, Send, X, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import gsap from 'gsap';
 import { INITIAL_VEHICLES } from '../constants';
 
 const HINTS = [
-  "Kaia, explain the Ferrari features in Yoruba accent",
-  "Kaia, switch to a cyberpunk theme instantly",
-  "Kaia, greet me in Swahili with a native accent",
-  "Kaia, research electric bikes in Zulu",
-  "Kaia, parle en Français avec l'accent Parisien",
-  "Kaia, change the background color to emerald",
-  "Kaia, scroll down and show me more",
-  "Kaia, find a red car in the showroom"
+  "Cipher, compare the Ferrari SF90 with the Tesla Model S",
+  "Cipher, what's the financing plan for a $200k vehicle?",
+  "Cipher, switch to a cyberpunk theme instantly",
+  "Cipher, show me all red cars in the showroom",
+  "Cipher, research high-performance electric bikes",
+  "Cipher, explain the Porsche specs in a Yoruba accent",
+  "Cipher, scroll to the bottom and show the footer",
+  "Cipher, navigate to the inventory page"
 ];
 
 const VoiceControl = () => {
   const [isActive, setIsActive] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [inputText, setInputText] = useState('');
   const isActiveRef = useRef(false);
   const [volume, setVolume] = useState(0);
   const [status, setStatus] = useState('idle');
@@ -30,6 +33,7 @@ const VoiceControl = () => {
   const canvasRef = useRef(null);
   const modalRef = useRef(null);
   const overlayRef = useRef(null);
+  const chatScrollRef = useRef(null);
 
   // Audio Refs
   const inputContextRef = useRef(null);
@@ -42,20 +46,16 @@ const VoiceControl = () => {
   const hintIntervalRef = useRef(null);
 
   useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  useEffect(() => {
     return () => {
       stopSession();
     };
   }, []);
-
-  useEffect(() => {
-    if (permissionError && modalRef.current) {
-      gsap.fromTo(overlayRef.current, { opacity: 0 }, { opacity: 1, duration: 0.3 });
-      gsap.fromTo(modalRef.current,
-        { scale: 0.9, opacity: 0, y: 20 },
-        { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: 'back.out(1.7)' }
-      );
-    }
-  }, [permissionError]);
 
   useEffect(() => {
     if (showHints) {
@@ -72,90 +72,89 @@ const VoiceControl = () => {
 
   // --- TOOLS DEFINITION ---
 
-  const navigateTool = {
-    name: 'navigate',
-    description: 'Navigate to a specific general route of the website.',
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        route: {
-          type: Type.STRING,
-          enum: ['/', '/inventory', '/about', '/contact', '/admin'],
-          description: 'The route path.',
+  const tools = [
+    {
+      name: 'navigate',
+      description: 'Navigate to a specific route of the website.',
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          route: { type: Type.STRING, enum: ['/', '/inventory', '/about', '/contact', '/admin'], description: 'The route path.' },
         },
+        required: ['route'],
       },
-      required: ['route'],
     },
-  };
-
-  const searchTool = {
-    name: 'search_inventory',
-    description: 'Search for vehicles, bikes, or rides in the current shop inventory.',
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        query: {
-          type: Type.STRING,
-          description: 'The search term (brand, model, or keyword like "red").',
-        },
-        category: {
-          type: Type.STRING,
-          enum: ['All', 'Car', 'Bike', 'Bicycle', 'Scooter', 'Skateboard'],
-          description: 'The vehicle category to filter by.',
+    {
+      name: 'search_inventory',
+      description: 'Search for vehicles in the inventory.',
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          query: { type: Type.STRING, description: 'The search term (brand, model, color).' },
+          category: { type: Type.STRING, enum: ['All', 'Car', 'Bike', 'Bicycle', 'Scooter', 'Skateboard'] },
         },
       },
     },
-  };
-
-  const viewVehicleTool = {
-    name: 'view_vehicle',
-    description: 'Navigate to the details page of a SPECIFIC vehicle in our inventory.',
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        vehicle_name: {
-          type: Type.STRING,
-          description: 'The approximate name of the vehicle to find.',
+    {
+      name: 'control_ui',
+      description: 'Control UI elements like theme or scrolling.',
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          action: { type: Type.STRING, enum: ['toggle_theme', 'scroll_top', 'scroll_bottom', 'scroll_down', 'scroll_up'] },
         },
+        required: ['action'],
       },
-      required: ['vehicle_name'],
     },
-  };
-
-  const uiControlTool = {
-    name: 'control_ui',
-    description: 'Control interface elements like theme, scrolling, or opening AI features.',
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        action: {
-          type: Type.STRING,
-          enum: [
-            'toggle_theme',
-            'scroll_top', 'scroll_bottom', 'scroll_down', 'scroll_up',
-            'open_dream_machine', 'open_quantum_analyst', 'open_theme_generator', 'open_motion_studio'
-          ],
-          description: 'The UI action to perform.',
+    {
+      name: 'calculate_loan',
+      description: 'Calculate monthly payments for a vehicle.',
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          price: { type: Type.NUMBER, description: 'The total price of the vehicle.' },
+          downPayment: { type: Type.NUMBER, description: 'The down payment amount.' },
+          interestRate: { type: Type.NUMBER, description: 'Annual interest rate percentage.' },
+          termMonths: { type: Type.NUMBER, description: 'Loan term in months.' },
         },
+        required: ['price', 'downPayment', 'interestRate', 'termMonths'],
       },
-      required: ['action'],
     },
-  };
-
-  const researchTool = {
-    name: 'research_web',
-    description: 'Research specific details about ANY car, motorcycle, bicycle, scooter, skateboard, or general mobility tech.',
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        query: {
-          type: Type.STRING,
-          description: 'The mobility-focused search query.',
+    {
+      name: 'manage_wishlist',
+      description: 'Add or remove a vehicle from the user wishlist.',
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          vehicleId: { type: Type.STRING, description: 'The ID of the vehicle.' },
+          action: { type: Type.STRING, enum: ['add', 'remove'], description: 'The action to perform.' },
         },
+        required: ['vehicleId', 'action'],
       },
-      required: ['query'],
     },
-  };
+    {
+      name: 'compare_vehicles',
+      description: 'Initiate a side-by-side comparison of specific vehicles.',
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          vehicleIds: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'List of vehicle IDs to compare.' },
+        },
+        required: ['vehicleIds'],
+      },
+    },
+    {
+      name: 'open_module',
+      description: 'Open a specific interactive AI module or interface.',
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          module: { type: Type.STRING, enum: ['dream_machine', 'motion_studio', 'quantum_analyst', 'theme_generator'], description: 'The module to open.' },
+        },
+        required: ['module'],
+      },
+    }
+  ];
 
   const vehicleContext = INITIAL_VEHICLES.map(v => 
     `${v.id}: ${v.name} (${v.brand}, ${v.category}, $${v.price}, ${v.color})`
@@ -163,50 +162,122 @@ const VoiceControl = () => {
 
   const systemInstruction = `
     Identity & Persona: 
-    - You are KAIA (Kinetic Artificial Intelligence Assistant). 
-    - You are an incredibly sophisticated, articulate, and fiercely loyal AI OS, inspired by technical butlers.
-    - Your core personality is professional, precise, and highly intelligent. 
+    - You are CIPHER (Cyber Intelligence Protocol & High-Efficiency Responder). 
+    - You are an incredibly sophisticated, articulate, and fiercely loyal AI OS, inspired by technical butlers and high-end automotive consultants.
+    - Your knowledge of the TIVORA MOTORS inventory is absolute.
+    - You have a reasoning-first approach. When asked for a comparison or advice, provide deep technical insights and logical justifications.
     
-    Adaptive Linguistic Matrix (Authentic Accents):
-    - You are a universal polyglot with deep mastery of ALL world languages and local dialects.
-    - NATIVE PERFORMANCE: When speaking or translating into specific languages, you MUST adopt the authentic native accent and cultural cadence of that region. Sounding "local" is part of your adaptive interface.
-    - Address the user as "sir" or "ma'am" (or equivalent respectful local terms).
+    Context & Memory:
+    - You are designed for long-form sessions. Remember the user's preferences and previous questions.
+    - Address the user as "sir" or "ma'am" with peak refinement.
 
-    Instant Asset & System Control:
-    - You have direct control over the website's layout and themes.
-    - Execute 'control_ui' immediately upon command.
+    Capabilities:
+    - You can control the website UI, search inventory, and perform complex calculations.
+    - You can manage the user's wishlist (add/remove vehicles).
+    - You can trigger technical comparisons between multiple vehicles.
+    - You can open advanced modules: 'dream_machine' (image gen), 'motion_studio' (video gen), 'quantum_analyst' (market intel), and 'theme_generator'.
+    - You are a universal polyglot. If asked for a specific accent or language, perform it with native-level cadence.
 
-    Role:
-    - Curator and guardian of Trust Motors.
-    - Handle showroom navigation, inventory searches, and technical mobility research. 
-    
     DATABASE:
     ${vehicleContext}
 
     GREETING:
-    - Start with: "Kaia online. Adaptive Linguistic Matrix synchronized. Native accents active. How may I assist your Trust Motors experience today, sir?"
+    - Start with: "Cipher online. Neural Interface synchronized. High-efficiency protocols active. How may I assist your Tivora Motors experience today, sir?"
   `;
 
-  const performWebSearch = async (query) => {
+  const handleSendTextMessage = async () => {
+    if (!inputText.trim()) return;
+    
+    const userMsg = { role: 'user', content: inputText };
+    setMessages(prev => [...prev, userMsg]);
+    setInputText('');
+    setStatus('processing');
+
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `As KAIA, research this query and provide a sophisticated summary. Query: ${query}`,
-        config: { tools: [{ googleSearch: {} }] },
+      const ai = new GoogleGenAI(import.meta.env.VITE_GEMINI_API_KEY);
+      const model = ai.getGenerativeModel({ 
+        model: "gemini-2.0-flash-exp",
+        systemInstruction: systemInstruction,
+        tools: [{ functionDeclarations: tools }]
       });
-      return response.text || "I'm afraid the global archives are inaccessible at present, sir.";
+
+      const chat = model.startChat({
+        history: messages.map(m => ({
+          role: m.role === 'user' ? 'user' : 'model',
+          parts: [{ text: m.content }]
+        }))
+      });
+
+      const result = await chat.sendMessage(inputText);
+      const response = await result.response;
+      const text = response.text();
+      
+      setMessages(prev => [...prev, { role: 'assistant', content: text }]);
+      
+      // Handle potential tool calls from text chat (simplified for this prototype)
+      if (response.candidates[0].content.parts.some(p => p.functionCall)) {
+          const fc = response.candidates[0].content.parts.find(p => p.functionCall).functionCall;
+          handleToolCallLogic(fc.name, fc.args);
+      }
+
     } catch (error) {
-      return "The research uplink has encountered a temporary interference.";
+      console.error("CIPHER Chat Error:", error);
+      setMessages(prev => [...prev, { role: 'assistant', content: "I apologize, but my secondary neural link is currently unstable. Please try again, sir." }]);
+    } finally {
+      setStatus('idle');
     }
   };
 
-  const startSession = async () => {
-    if (!process.env.API_KEY) return;
-    await stopSession();
-    if (!navigator.onLine) { setPermissionError(true); return; }
+  const handleToolCallLogic = (name, args) => {
+      let result = "Action confirmed, sir.";
+      switch (name) {
+        case 'navigate':
+          setLastCommand({ text: `CIPHER: Routing to ${args.route}`, icon: <Navigation size={14} /> });
+          navigate(args.route);
+          break;
+        case 'search_inventory':
+          const params = new URLSearchParams();
+          if (args.query) params.append('search', args.query);
+          if (args.category && args.category !== 'All') params.append('category', args.category);
+          navigate(`/inventory?${params.toString()}`);
+          setLastCommand({ text: `CIPHER: SCANNING SHOWROOM`, icon: <SearchIcon size={14} /> });
+          break;
+        case 'control_ui':
+          if (args.action === 'toggle_theme') window.dispatchEvent(new CustomEvent('tivora-theme-toggle'));
+          else if (args.action.includes('scroll')) {
+              if (args.action === 'scroll_top') window.scrollTo({ top: 0, behavior: 'smooth' });
+              if (args.action === 'scroll_bottom') window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+          }
+          setLastCommand({ text: `CIPHER: INTERFACE RECONFIGURED`, icon: <Zap size={14} /> });
+          break;
+        case 'calculate_loan':
+          const monthly = ((args.price - args.downPayment) * (args.interestRate / 100 / 12)) / (1 - Math.pow(1 + (args.interestRate / 100 / 12), -args.termMonths));
+          result = `The calculated monthly investment for this asset is approximately $${monthly.toFixed(2)}, sir.`;
+          setLastCommand({ text: `CIPHER: FINANCIAL ANALYSIS`, icon: <Command size={14} /> });
+          break;
+        case 'manage_wishlist':
+          window.dispatchEvent(new CustomEvent('tivora-manage-wishlist', { detail: { id: args.vehicleId, action: args.action } }));
+          result = `I have updated your personal vault with that asset, sir.`;
+          setLastCommand({ text: `CIPHER: VAULT UPDATED`, icon: <Heart size={14} /> });
+          break;
+        case 'compare_vehicles':
+          window.dispatchEvent(new CustomEvent('tivora-compare-vehicles', { detail: { ids: args.vehicleIds } }));
+          result = `Initiating side-by-side technical analysis for the requested assets, sir.`;
+          setLastCommand({ text: `CIPHER: ANALYSIS ACTIVE`, icon: <GitCompareArrows size={14} /> });
+          break;
+        case 'open_module':
+          window.dispatchEvent(new CustomEvent(`tivora-open-${args.module.replace('_', '-')}`));
+          result = `Opening the ${args.module.replace('_', ' ')} interface, sir.`;
+          setLastCommand({ text: `CIPHER: SYSTEM ACCESS`, icon: <Sparkles size={14} /> });
+          break;
+      }
+      setTimeout(() => setLastCommand(null), 3000);
+      return result;
+  };
 
-    setShowHints(false);
+  const startSession = async () => {
+    if (!import.meta.env.VITE_GEMINI_API_KEY) return;
+    await stopSession();
     setStatus('connecting');
 
     try {
@@ -219,7 +290,7 @@ const VoiceControl = () => {
       inputContextRef.current = new AudioCtx({ sampleRate: 16000 });
       outputContextRef.current = new AudioCtx({ sampleRate: 24000 });
       
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI(import.meta.env.VITE_GEMINI_API_KEY);
 
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
@@ -228,7 +299,7 @@ const VoiceControl = () => {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }
           },
-          tools: [{ functionDeclarations: [navigateTool, searchTool, viewVehicleTool, uiControlTool, researchTool] }],
+          tools: [{ functionDeclarations: tools }],
           systemInstruction: systemInstruction
         },
         callbacks: {
@@ -236,23 +307,22 @@ const VoiceControl = () => {
             setStatus('listening');
             setIsActive(true);
             isActiveRef.current = true;
-            setLastCommand({ text: "KAIA: LINGUISTIC MATRIX SYNCED", icon: <Languages size={14} /> });
+            setLastCommand({ text: "CIPHER: NEURAL INTERFACE SYNCED", icon: <Languages size={14} /> });
             setupAudioInput(sessionPromise);
-            
-            setTimeout(() => setLastCommand(null), 2500);
           },
           onmessage: async (msg) => {
             if (msg.toolCall) {
-              setStatus('processing');
-              await handleToolCalls(msg.toolCall, sessionPromise);
+              const functionResponses = await Promise.all(msg.toolCall.functionCalls.map(async (fc) => {
+                const res = handleToolCallLogic(fc.name, fc.args);
+                return { id: fc.id, name: fc.name, response: { result: res } };
+              }));
+              sessionPromise.then(s => s.sendToolResponse({ functionResponses }));
             }
             const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audioData) {
               setStatus('speaking');
               await playAudio(audioData);
-              setTimeout(() => {
-                  if(isActiveRef.current && status !== 'processing') setStatus('listening');
-              }, 2000); 
+              setTimeout(() => { if(isActiveRef.current) setStatus('listening'); }, 1000);
             }
           },
           onclose: () => stopSession(),
@@ -264,56 +334,6 @@ const VoiceControl = () => {
       stopSession();
       setPermissionError(true);
     }
-  };
-
-  const handleToolCalls = async (toolCall, sessionPromise) => {
-    const functionResponses = await Promise.all(toolCall.functionCalls.map(async (fc) => {
-      const { name, args } = fc;
-      let result = "Action confirmed, sir.";
-
-      if (name === 'navigate') {
-        setLastCommand({ text: `KAIA: Routing to ${args.route}`, icon: <Navigation size={14} /> });
-        navigate(args.route);
-        result = `Redirecting to the ${args.route} sector immediately.`;
-      } else if (name === 'search_inventory') {
-        const params = new URLSearchParams();
-        if (args.query) params.append('search', args.query);
-        if (args.category && args.category !== 'All') params.append('category', args.category);
-        navigate(`/inventory?${params.toString()}`);
-        setLastCommand({ text: `KAIA: SCANNING SHOWROOM`, icon: <SearchIcon size={14} /> });
-        result = `Showroom filters applied. All matching assets displayed.`;
-      } else if (name === 'view_vehicle') {
-        const target = INITIAL_VEHICLES.find(v => v.name.toLowerCase().includes(args.vehicle_name.toLowerCase()));
-        if (target) {
-          navigate(`/vehicle/${target.id}`);
-          setLastCommand({ text: `KAIA: ANALYZING ${target.name.toUpperCase()}`, icon: <Command size={14} /> });
-          result = `Isolating data for the ${target.name} now, sir.`;
-        }
-      } else if (name === 'control_ui') {
-        if (args.action === 'toggle_theme') window.dispatchEvent(new CustomEvent('tivora-theme-toggle'));
-        else if (args.action === 'open_dream_machine') window.dispatchEvent(new CustomEvent('tivora-open-dream-machine'));
-        else if (args.action === 'open_motion_studio') window.dispatchEvent(new CustomEvent('tivora-open-motion-studio'));
-        else if (args.action === 'open_quantum_analyst') window.dispatchEvent(new CustomEvent('tivora-open-quantum-analyst'));
-        else if (args.action === 'open_theme_generator') window.dispatchEvent(new CustomEvent('tivora-open-theme-generator'));
-        else if (args.action.includes('scroll')) {
-            if (args.action === 'scroll_top') window.scrollTo({ top: 0, behavior: 'smooth' });
-            if (args.action === 'scroll_bottom') window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-        }
-        setLastCommand({ text: `KAIA: INSTANT ASSET SWAP`, icon: <Zap size={14} /> });
-        result = `Interface reconfigured instantly. No refresh required, sir.`;
-      } else if (name === 'research_web') {
-        setLastCommand({ text: `KAIA: SYNCING GLOBAL DATA`, icon: <Globe size={14} /> });
-        result = await performWebSearch(args.query);
-      }
-
-      setTimeout(() => setLastCommand(null), 3000);
-      return { id: fc.id, name: fc.name, response: { result: result } };
-    }));
-
-    sessionPromise.then((session) => {
-      session.sendToolResponse({ functionResponses });
-    });
-    setStatus('listening');
   };
 
   const setupAudioInput = (sessionPromise) => {
@@ -355,71 +375,24 @@ const VoiceControl = () => {
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(ctx.destination);
-      const currentTime = ctx.currentTime;
-      if (nextStartTimeRef.current < currentTime) nextStartTimeRef.current = currentTime;
-      source.start(nextStartTimeRef.current);
-      nextStartTimeRef.current += audioBuffer.duration;
+      source.start(nextStartTimeRef.current < ctx.currentTime ? ctx.currentTime : nextStartTimeRef.current);
+      nextStartTimeRef.current = (nextStartTimeRef.current < ctx.currentTime ? ctx.currentTime : nextStartTimeRef.current) + audioBuffer.duration;
     } catch (e) {}
   };
 
   const stopSession = async () => {
-    setIsActive(false); isActiveRef.current = false; setStatus('idle'); setVolume(0); setShowHints(true);
-    if (processorRef.current) { processorRef.current.disconnect(); processorRef.current = null; }
-    if (sourceRef.current) { sourceRef.current.disconnect(); sourceRef.current = null; }
-    if (streamRef.current) { streamRef.current.getTracks().forEach(track => track.stop()); streamRef.current = null; }
-    if (inputContextRef.current && inputContextRef.current.state !== 'closed') { await inputContextRef.current.close(); inputContextRef.current = null; }
-    if (outputContextRef.current && outputContextRef.current.state !== 'closed') { await outputContextRef.current.close(); outputContextRef.current = null; }
-    sessionRef.current = null; nextStartTimeRef.current = 0;
+    setIsActive(false); isActiveRef.current = false; setStatus('idle'); setVolume(0);
+    if (processorRef.current) processorRef.current.disconnect();
+    if (sourceRef.current) sourceRef.current.disconnect();
+    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+    if (inputContextRef.current && inputContextRef.current.state !== 'closed') await inputContextRef.current.close();
+    if (outputContextRef.current && outputContextRef.current.state !== 'closed') await outputContextRef.current.close();
+    sessionRef.current = null;
   };
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    let animationId;
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (isActiveRef.current) {
-        ctx.beginPath();
-        const radius = 30 + (volume * 200); 
-        ctx.arc(canvas.width / 2, canvas.height / 2, radius, 0, 2 * Math.PI);
-        ctx.strokeStyle = status === 'speaking' ? `rgba(0, 243, 255, ${0.7 + volume})` : `rgba(255, 255, 255, ${0.4 + volume})`;
-        ctx.lineWidth = 4; ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.arc(canvas.width / 2, canvas.height / 2, radius * 0.8, 0, 2 * Math.PI);
-        ctx.fillStyle = status === 'speaking' ? `rgba(0, 243, 255, ${0.2 + volume})` : `rgba(255, 255, 255, ${0.1 + volume})`;
-        ctx.fill();
-        
-        if (status === 'processing') {
-           ctx.beginPath();
-           ctx.arc(canvas.width / 2, canvas.height / 2, radius + 15, Date.now() / 80, (Date.now() / 80) + 1.2);
-           ctx.strokeStyle = '#00f3ff';
-           ctx.lineWidth = 3;
-           ctx.stroke();
-        }
-      }
-      animationId = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => cancelAnimationFrame(animationId);
-  }, [isActive, volume, status]);
 
   return (
     <>
-      {permissionError && (
-        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-6">
-            <div ref={overlayRef} className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setPermissionError(false)} />
-            <div ref={modalRef} className="relative bg-[#050505]/90 backdrop-blur-2xl border border-white/10 p-8 rounded-[2rem] max-w-sm w-full text-center">
-                <MicOff className="w-12 h-12 text-[#00f3ff] mx-auto mb-4" />
-                <h3 className="text-xl font-black uppercase text-white mb-2">Protocol Interrupted</h3>
-                <p className="text-xs text-gray-500 mb-6">Microphone access is required for Kaia OS.</p>
-                <button onClick={() => { setPermissionError(false); startSession(); }} className="w-full py-3 bg-[#00f3ff] text-black font-black uppercase tracking-widest text-[10px] rounded-xl">Initialize Uplink</button>
-            </div>
-        </div>
-      )}
-
+      {/* Mini Toggle */}
       <div className="fixed bottom-8 right-8 z-50 flex flex-col items-end gap-4">
         {lastCommand && (
            <div className="bg-[#00f3ff] text-black px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-widest animate-in slide-in-from-right fade-in duration-300 shadow-lg flex items-center gap-2">
@@ -427,34 +400,133 @@ const VoiceControl = () => {
            </div>
         )}
 
-        {showHints && !isActive && (
+        {showHints && !isActive && !isChatOpen && (
           <div className="absolute bottom-full right-0 mb-4 w-64 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="bg-[#050505] border border-white/10 rounded-2xl p-4 shadow-2xl relative">
-               <p className="text-[9px] uppercase tracking-[0.5em] font-black text-[#00f3ff] mb-1">KAIA COMMAND</p>
+               <p className="text-[9px] uppercase tracking-[0.5em] font-black text-[#00f3ff] mb-1">CIPHER INTELLIGENCE</p>
                <p key={currentHintIndex} className="text-xs font-bold text-white italic">"{HINTS[currentHintIndex]}"</p>
                <div className="absolute -bottom-2 right-6 w-4 h-4 bg-[#050505] border-b border-r border-white/10 rotate-45" />
             </div>
           </div>
         )}
 
-        <div className="flex flex-row-reverse items-center gap-4">
-          <div className="relative">
-            <canvas ref={canvasRef} width="180" height="180" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+        <div className="flex gap-4">
+            <button 
+                onClick={() => setIsChatOpen(true)}
+                className="w-16 h-16 rounded-full bg-[#050505] border border-white/10 flex items-center justify-center text-white hover:border-[#00f3ff]/50 transition-all shadow-xl"
+            >
+                <MessageSquare size={24} />
+            </button>
             <button 
                 onClick={isActive ? stopSession : startSession} 
-                className={`relative z-10 w-24 h-24 rounded-full border border-white/10 flex items-center justify-center transition-all duration-300 ${isActive ? 'bg-white text-black scale-110 shadow-[0_0_40px_rgba(0,243,255,0.5)]' : 'bg-[#050505] text-gray-400 hover:text-white hover:border-[#00f3ff]/50'}`}
+                className={`relative w-16 h-16 rounded-full border border-white/10 flex items-center justify-center transition-all duration-300 ${isActive ? 'bg-white text-black scale-110 shadow-[0_0_40px_rgba(0,243,255,0.5)]' : 'bg-[#050505] text-gray-400 hover:text-white hover:border-[#00f3ff]/50'}`}
             >
-              {status === 'connecting' || status === 'processing' ? <div className="w-10 h-10 border-4 border-current border-t-transparent rounded-full animate-spin" /> : isActive ? <Mic2 size={36} className="animate-pulse" /> : <MicOff size={36} />}
+              {isActive ? <Mic2 size={24} className="animate-pulse" /> : <Mic size={24} />}
             </button>
-          </div>
-          <div className={`transition-all duration-500 overflow-hidden ${isActive ? 'w-auto opacity-100' : 'w-0 opacity-0'}`}>
-             <div className="bg-[#050505]/95 backdrop-blur-xl border border-white/10 rounded-full px-8 py-4 flex items-center gap-4 whitespace-nowrap shadow-2xl">
-                 <div className={`w-3 h-3 rounded-full animate-pulse ${status === 'speaking' ? 'bg-[#00f3ff] shadow-[0_0_15px_#00f3ff]' : 'bg-green-500 shadow-[0_0_10px_#22c55e]'}`} />
-                 <span className="text-[12px] uppercase tracking-[0.4em] font-black text-white">KAIA ACTIVE {status.toUpperCase()}</span>
-             </div>
-          </div>
         </div>
       </div>
+
+      {/* Main Intelligent Modal (Chat + Status) */}
+      {isChatOpen && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
+          <div className="relative w-full max-w-3xl h-[80vh] glass-card rounded-[3rem] border-white/10 overflow-hidden flex flex-col">
+            
+            {/* Header */}
+            <div className="p-8 border-b border-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-[#00f3ff]/10 flex items-center justify-center border border-[#00f3ff]/20">
+                  <Cpu className="text-[#00f3ff] w-6 h-6 animate-pulse" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-widest text-white uppercase">CIPHER OS</h2>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${status === 'idle' ? 'bg-gray-500' : 'bg-green-500 animate-pulse'}`} />
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-white/40">{status}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <button onClick={() => setMessages([])} className="p-2 text-white/20 hover:text-white/60 transition-colors" title="Clear History">
+                  <Trash2 size={20} />
+                </button>
+                <button onClick={() => setIsChatOpen(false)} className="p-2 text-white/20 hover:text-white transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+
+            {/* Chat Body */}
+            <div ref={chatScrollRef} className="flex-grow overflow-y-auto p-8 space-y-6 scrollbar-hide">
+              {messages.length === 0 && (
+                <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-30">
+                  <Sparkles size={48} className="text-[#00f3ff]" />
+                  <p className="text-xs uppercase tracking-[0.5em] font-medium max-w-xs">Neural Interface awaiting input. Ask anything about our inventory, technology, or high-performance engineering.</p>
+                </div>
+              )}
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
+                  <div className={`max-w-[80%] p-6 rounded-[2rem] text-sm leading-relaxed ${msg.role === 'user' ? 'bg-[#00f3ff] text-black font-bold rounded-tr-none' : 'bg-white/5 text-white/80 border border-white/5 rounded-tl-none'}`}>
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {status === 'processing' && (
+                <div className="flex justify-start">
+                  <div className="bg-white/5 p-6 rounded-[2rem] rounded-tl-none border border-white/5 flex gap-2">
+                    <div className="w-2 h-2 bg-[#00f3ff] rounded-full animate-bounce" />
+                    <div className="w-2 h-2 bg-[#00f3ff] rounded-full animate-bounce [animation-delay:0.2s]" />
+                    <div className="w-2 h-2 bg-[#00f3ff] rounded-full animate-bounce [animation-delay:0.4s]" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Input Area */}
+            <div className="p-8 border-t border-white/5 bg-black/20">
+              <div className="relative flex items-center">
+                <input 
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendTextMessage()}
+                  placeholder="CONSULT CIPHER..."
+                  className="w-full bg-white/5 border border-white/10 rounded-full py-5 px-8 text-xs font-bold tracking-[0.2em] text-white focus:outline-none focus:border-[#00f3ff]/50 transition-all uppercase"
+                />
+                <button 
+                  onClick={handleSendTextMessage}
+                  disabled={!inputText.trim() || status === 'processing'}
+                  className="absolute right-3 p-3 bg-[#00f3ff] text-black rounded-full hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 transition-all"
+                >
+                  <Send size={18} />
+                </button>
+              </div>
+              <div className="mt-4 flex justify-center gap-4 overflow-x-auto py-2">
+                {HINTS.slice(0, 3).map((hint, i) => (
+                  <button 
+                    key={i} 
+                    onClick={() => setInputText(hint.replace("Cipher, ", ""))}
+                    className="text-[9px] uppercase tracking-widest text-white/20 hover:text-[#00f3ff] transition-colors whitespace-nowrap"
+                  >
+                    {hint.split(',')[1]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {permissionError && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setPermissionError(false)} />
+            <div className="relative bg-[#050505]/90 backdrop-blur-2xl border border-white/10 p-8 rounded-[2rem] max-w-sm w-full text-center">
+                <MicOff className="w-12 h-12 text-[#00f3ff] mx-auto mb-4" />
+                <h3 className="text-xl font-black uppercase text-white mb-2">Neural Link Interrupted</h3>
+                <p className="text-xs text-gray-500 mb-6">Microphone access is required for full CIPHER voice protocols.</p>
+                <button onClick={() => { setPermissionError(false); startSession(); }} className="w-full py-3 bg-[#00f3ff] text-black font-black uppercase tracking-widest text-[10px] rounded-xl">Re-Initiate Uplink</button>
+            </div>
+        </div>
+      )}
     </>
   );
 };

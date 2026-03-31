@@ -1,27 +1,29 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Settings, Sun, Moon } from 'lucide-react';
+import { Menu, X, Settings, Sun, Moon, LogIn, UserPlus, LogOut, LayoutDashboard } from 'lucide-react'; // Added new icons
+import { useAuth } from '../hooks/useAuth.jsx'; // Import useAuth
 
-const Navbar = () => {
+const Navbar = ({ Logo }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isDark, setIsDark] = useState(true);
   const location = useLocation();
+  const { user, logout } = useAuth(); // Use the authentication hook
 
   const toggleTheme = () => {
     const newTheme = !isDark;
     setIsDark(newTheme);
     if (newTheme) {
       document.body.classList.remove('light-mode');
-      localStorage.setItem('trust_motors_theme', 'dark');
+      localStorage.setItem('tivora_motors_theme', 'dark');
     } else {
       document.body.classList.add('light-mode');
-      localStorage.setItem('trust_motors_theme', 'light');
+      localStorage.setItem('tivora_motors_theme', 'light');
     }
   };
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('trust_motors_theme');
+    const savedTheme = localStorage.getItem('tivora_motors_theme');
     
     if (savedTheme === 'light') {
       setIsDark(false);
@@ -55,25 +57,11 @@ const Navbar = () => {
           <div className="flex items-center">
             <Link to="/" className="flex items-center gap-4 group">
               <div className="relative w-10 h-10 flex items-center justify-center">
-                <div className="absolute inset-0 bg-accent/20 blur-xl rounded-full opacity-50 group-hover:opacity-80 transition-opacity duration-700" />
-                <svg 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="1.2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  className="w-full h-full text-foreground group-hover:text-accent transition-colors duration-500 relative z-10"
-                >
-                  <path d="M6 3h12l4 6-10 13L2 9z" />
-                  <path d="M10 22L8 9l5.5-6" />
-                  <path d="M14 22l2-13-5.5-6" />
-                </svg>
+
+                                <Logo/>
               </div>
               
-              <div className="text-xl font-black tracking-widest text-foreground uppercase font-display ml-1">
-                TRUST<span className="text-accent">_MOTORS</span>
-              </div>
+
             </Link>
           </div>
           
@@ -103,9 +91,44 @@ const Navbar = () => {
                 {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
 
+              {user ? (
+                <>
+                  <Link
+                    to="/dashboard"
+                    className="p-2 text-foreground/60 hover:text-foreground transition-colors rounded-full hover:bg-foreground/5"
+                    title="User Dashboard"
+                  >
+                    <LayoutDashboard className="w-5 h-5" />
+                  </Link>
+                  <button
+                    onClick={logout}
+                    className="p-2 text-foreground/60 hover:text-red-500 transition-colors rounded-full hover:bg-foreground/5"
+                    title="Logout"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="p-2 text-foreground/60 hover:text-foreground transition-colors rounded-full hover:bg-foreground/5"
+                    title="Login"
+                  >
+                    <LogIn className="w-5 h-5" />
+                  </Link>
+                  <Link
+                    to="/signup"
+                    className="p-2 text-foreground/60 hover:text-foreground transition-colors rounded-full hover:bg-foreground/5"
+                    title="Sign Up"
+                  >
+                    <UserPlus className="w-5 h-5" />
+                  </Link>
+                </>
+              )}
               <Link
                 to="/admin"
-                className="p-2 text-foreground/60 hover:text-foreground transition-colors"
+                className="p-2 text-foreground/60 hover:text-foreground transition-colors rounded-full hover:bg-foreground/5"
                 title="Admin Dashboard"
               >
                 <Settings className="w-5 h-5" />
@@ -149,6 +172,40 @@ const Navbar = () => {
               </Link>
             ))}
             <div className="h-px w-full bg-foreground/5 my-8" />
+            {user ? (
+              <>
+                <Link
+                  to="/dashboard"
+                  onClick={() => setIsOpen(false)}
+                  className="block text-xl text-foreground/60 font-black uppercase tracking-widest hover:text-foreground"
+                >
+                  My Dashboard
+                </Link>
+                <button
+                  onClick={() => { setIsOpen(false); logout(); }}
+                  className="block text-xl text-foreground/60 font-black uppercase tracking-widest hover:text-foreground w-full text-left"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  onClick={() => setIsOpen(false)}
+                  className="block text-xl text-foreground/60 font-black uppercase tracking-widest hover:text-foreground"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  onClick={() => setIsOpen(false)}
+                  className="block text-xl text-foreground/60 font-black uppercase tracking-widest hover:text-foreground"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
             <Link
               to="/admin"
               onClick={() => setIsOpen(false)}
@@ -160,7 +217,7 @@ const Navbar = () => {
           
           <div className="mt-20">
              <p className="text-[10px] font-black text-foreground/50 uppercase tracking-[0.4em] mb-4">Connection Line</p>
-             <p className="text-2xl font-black text-foreground">+1 (555) TRUST-88</p>
+             <p className="text-2xl font-black text-foreground">+1 (555) TIVORA-8</p>
           </div>
         </div>
       )}

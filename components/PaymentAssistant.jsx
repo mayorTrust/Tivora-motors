@@ -87,7 +87,7 @@ const PaymentAssistant = ({ vehicleName, price, isOpen, onClose }) => {
     setIsTyping(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI(import.meta.env.VITE_GEMINI_API_KEY);
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [...messages, userMessage].map(m => ({

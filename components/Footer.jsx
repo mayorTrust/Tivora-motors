@@ -14,27 +14,16 @@ const Footer = () => {
           <div className="space-y-8">
             <Link to="/" className="flex items-center gap-4 group">
               <div className="relative w-12 h-12 flex items-center justify-center">
-                 <div className="absolute inset-0 bg-accent/10 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-                 <svg 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="1.2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  className="w-full h-full text-foreground group-hover:text-accent transition-colors duration-500 relative z-10"
-                >
-                  <path d="M6 3h12l4 6-10 13L2 9z" />
-                  <path d="M10 22L8 9l5.5-6" />
-                  <path d="M14 22l2-13-5.5-6" />
-                </svg>
-              </div>
-              <div className="text-2xl font-black tracking-widest text-foreground uppercase font-display ml-1">
-                TRUST<span className="text-accent">_MOTORS</span>
-              </div>
+
+                                  <img
+                                   src="/trlogos.png"
+                                   alt="Tivora Motors Logo"
+                                   className="w-full h-full object-contain"
+                                 />              </div>
+
             </Link>
             <p className="text-foreground/50 leading-relaxed font-medium">
-              Curating the world's most exceptional automotive art. Trust Motors - Drive your legacy.
+              Curating the world's most exceptional automotive art. Tivora Motors - Drive your legacy.
             </p>
             <div className="flex gap-4">
               {[Facebook, Twitter, Instagram, Youtube].map((Icon, idx) => (
@@ -83,13 +72,13 @@ const Footer = () => {
                 <div className="w-10 h-10 rounded-xl bg-foreground/5 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-background transition-all">
                   <Phone className="w-4 h-4" />
                 </div>
-                <span className="text-foreground/60 font-black text-[11px] tracking-widest group-hover:text-foreground transition-colors">+1 (555) TRUST-88</span>
+                <span className="text-foreground/60 font-black text-[11px] tracking-widest group-hover:text-foreground transition-colors">+1 (555) TIVORA-8</span>
               </li>
               <li className="flex items-center gap-4 group">
                 <div className="w-10 h-10 rounded-xl bg-foreground/5 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-background transition-all">
                   <Mail className="w-4 h-4" />
                 </div>
-                <span className="text-foreground/60 font-black text-[11px] tracking-widest group-hover:text-foreground transition-colors">sales@trustmotors.com</span>
+                <span className="text-foreground/60 font-black text-[11px] tracking-widest group-hover:text-foreground transition-colors">sales@tivoramotors.com</span>
               </li>
               <li className="flex items-start gap-4 group">
                 <div className="w-10 h-10 rounded-xl bg-foreground/5 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-background transition-all mt-1">
@@ -103,7 +92,7 @@ const Footer = () => {
 
         <div className="pt-12 border-t border-foreground/5 flex flex-col md:flex-row justify-between items-center gap-8">
           <p className="text-foreground/40 text-[10px] font-black uppercase tracking-[0.5em]">
-            &copy; {new Date().getFullYear()} TRUST MOTORS &bull; ALL SYSTEMS OPERATIONAL
+            &copy; {new Date().getFullYear()} TIVORA MOTORS &bull; ALL SYSTEMS OPERATIONAL
           </p>
           <div className="flex gap-10">
             <a href="#" className="text-foreground/40 hover:text-foreground text-[9px] font-black uppercase tracking-widest transition-colors">Privacy</a>

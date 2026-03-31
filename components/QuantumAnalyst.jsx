@@ -34,7 +34,7 @@ const QuantumAnalyst = () => {
     setSources([]);
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI(import.meta.env.VITE_GEMINI_API_KEY);
       const result = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: query,

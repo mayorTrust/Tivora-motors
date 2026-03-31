@@ -29,7 +29,7 @@ const DreamMachine = () => {
     setGeneratedImage(null);
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI(import.meta.env.VITE_GEMINI_API_KEY);
       // Using gemini-2.5-flash-image for generation (via generateContent per SDK guidelines for this model)
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',

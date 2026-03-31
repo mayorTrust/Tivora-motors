@@ -80,7 +80,7 @@ const MotionStudio = () => {
 
     try {
         // Just-in-time Key Check
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI(import.meta.env.VITE_GEMINI_API_KEY);
         
         let operation;
         
@@ -126,7 +126,7 @@ const MotionStudio = () => {
 
         if (operation.response?.generatedVideos?.[0]?.video?.uri) {
             const downloadLink = operation.response.generatedVideos[0].video.uri;
-            const videoRes = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+            const videoRes = await fetch(`${downloadLink}&key=${import.meta.env.VITE_GEMINI_API_KEY}`);
             const videoBlob = await videoRes.blob();
             const videoUrl = URL.createObjectURL(videoBlob);
             setGeneratedVideo(videoUrl);

@@ -1,9 +1,17 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ChevronLeft, MapPin, Calendar, Gauge, CheckCircle, MessageCircle, CreditCard, Share2 } from 'lucide-react';
+import { ChevronLeft, MapPin, Calendar, Gauge, CheckCircle, MessageCircle, CreditCard, Share2, Heart } from 'lucide-react';
 import { SkeletonDetails } from '../components/Loading';
 import PaymentAssistant from '../components/PaymentAssistant';
+import FullSpecsTable from '../components/FullSpecsTable';
+import VehicleCard from '../components/VehicleCard'; // Import VehicleCard
+import ContactSellerForm from '../components/ContactSellerForm'; // New Import
+import BookTestDriveForm from '../components/BookTestDriveForm'; // New Import
+import LoanCalculator from '../components/LoanCalculator'; // New Import
+import CompareBar from '../components/CompareBar';
+import CompareModal from '../components/CompareModal';
+import { useWishlist } from '../hooks/useWishlist';
+import { useAuth } from '../hooks/useAuth';
 
 const VehicleDetails = ({ vehicles }) => {
   const { id } = useParams();
@@ -11,12 +19,49 @@ const VehicleDetails = ({ vehicles }) => {
   const [activeImage, setActiveImage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [isContactSellerOpen, setIsContactSellerOpen] = useState(false); // New State
+  const [isBookTestDriveOpen, setIsBookTestDriveOpen] = useState(false); // New State
+  
+  // State for compare feature
+  const [compareList, setCompareList] = useState([]);
+  const [showCompareModal, setShowCompareModal] = useState(false);
+
+  const { toggleWishlist, isInWishlist } = useWishlist();
+  const { user } = useAuth();
 
   useEffect(() => {
+    // Reset comparisons and scroll to top when vehicle changes
+    setCompareList([]);
+    window.scrollTo(0, 0);
     // Simulate loading details
     const timer = setTimeout(() => setLoading(false), 600);
     return () => clearTimeout(timer);
   }, [id]);
+
+  // CIPHER Event Listeners
+  useEffect(() => {
+    const handleVoiceWishlist = (e) => {
+      const { id: vid, action } = e.detail;
+      const alreadyIn = isInWishlist(vid);
+      if ((action === 'add' && !alreadyIn) || (action === 'remove' && alreadyIn)) {
+        toggleWishlist(vid);
+      }
+    };
+    
+    const handleVoiceCompare = (e) => {
+      const { ids } = e.detail;
+      setCompareList(ids);
+      setShowCompareModal(true);
+    };
+
+    window.addEventListener('tivora-manage-wishlist', handleVoiceWishlist);
+    window.addEventListener('tivora-compare-vehicles', handleVoiceCompare);
+    
+    return () => {
+      window.removeEventListener('tivora-manage-wishlist', handleVoiceWishlist);
+      window.removeEventListener('tivora-compare-vehicles', handleVoiceCompare);
+    };
+  }, [isInWishlist, toggleWishlist]);
 
   if (loading) {
     return <SkeletonDetails />;
@@ -31,10 +76,43 @@ const VehicleDetails = ({ vehicles }) => {
     );
   }
 
+  const isSaved = isInWishlist(vehicle.id);
+
+  const handleWishlistToggle = () => {
+    if (!user) {
+      alert('Please log in to save to wishlist.');
+      return;
+    }
+    toggleWishlist(vehicle.id);
+  };
+
+  const handleCompare = (vehicleId) => {
+    setCompareList(prev => {
+      if (prev.includes(vehicleId)) {
+        return prev.filter(id => id !== vehicleId);
+      }
+      if (prev.length >= 4) {
+        alert("Maximum 4 vehicles can be compared at once.");
+        return prev;
+      }
+      return [...prev, vehicleId];
+    });
+  };
+
+  const selectedToCompare = useMemo(() => {
+    return vehicles.filter(v => compareList.includes(v.id));
+  }, [vehicles, compareList]);
+
   const handleWhatsApp = () => {
     const message = encodeURIComponent(`Hi TIVORA_RIDES, I'm inquiring regarding ${vehicle.name} (${vehicle.year}) listed for $${vehicle.price.toLocaleString()}.`);
     window.open(`https://wa.me/1234567890?text=${message}`, '_blank');
   };
+
+  const similarVehicles = vehicles.filter(
+    (v) =>
+      v.id !== vehicle.id &&
+      (v.brand === vehicle.brand || v.category === vehicle.category)
+  ).slice(0, 3); // Get up to 3 similar vehicles
 
   return (
     <div className="pt-32 pb-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -42,9 +120,18 @@ const VehicleDetails = ({ vehicles }) => {
         <Link to="/inventory" className="flex items-center gap-3 text-foreground/50 hover:text-foreground transition-all group font-bold uppercase tracking-widest text-[10px]">
           <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform bg-foreground/5 rounded-full p-1" /> Collection Overview
         </Link>
-        <button className="p-3 bg-foreground/5 rounded-full hover:bg-foreground/10 transition-all text-foreground/60">
-          <Share2 className="w-4 h-4" />
-        </button>
+        <div className="flex gap-4">
+          <button 
+            onClick={handleWishlistToggle}
+            className={`p-3 rounded-full transition-all ${isSaved ? 'bg-accent text-background' : 'bg-foreground/5 text-foreground/60 hover:bg-foreground/10'}`}
+            title={isSaved ? "Remove from Wishlist" : "Save to Wishlist"}
+          >
+            <Heart className={`w-4 h-4 ${isSaved ? 'fill-background' : ''}`} />
+          </button>
+          <button className="p-3 bg-foreground/5 rounded-full hover:bg-foreground/10 transition-all text-foreground/60">
+            <Share2 className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -108,6 +195,8 @@ const VehicleDetails = ({ vehicles }) => {
             </p>
           </div>
 
+          <FullSpecsTable vehicle={vehicle} />
+
           <div className="space-y-6">
             <h3 className="text-xs font-black uppercase tracking-[0.3em] text-foreground/50">Core Specifications</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -127,16 +216,23 @@ const VehicleDetails = ({ vehicles }) => {
 
           <div className="flex flex-col sm:flex-row gap-5 pt-8">
             <button
-              onClick={() => setIsPaymentOpen(true)}
+              onClick={() => setIsBookTestDriveOpen(true)} // Open BookTestDriveForm
               className="flex-[1.2] bg-accent hover:brightness-110 text-background font-black py-5 rounded-2xl flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02] shadow-xl shadow-accent/20 uppercase tracking-widest text-xs"
             >
-              <CreditCard className="w-5 h-5" /> Secure Checkout
+              <Calendar className="w-5 h-5" /> Book Test Drive
             </button>
             <button 
-              onClick={handleWhatsApp}
+              onClick={() => setIsContactSellerOpen(true)} // Open ContactSellerForm
               className="flex-1 bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 text-foreground font-black py-5 rounded-2xl flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02] uppercase tracking-widest text-xs shadow-xl"
             >
-              <MessageCircle className="w-5 h-5" /> Inquire Price
+              <MessageCircle className="w-5 h-5" /> Contact Seller
+            </button>
+            {/* Keeping Secure Checkout for now, can be replaced later if needed */}
+            <button
+              onClick={() => setIsPaymentOpen(true)}
+              className="flex-1 bg-foreground/5 border border-foreground/10 hover:bg-foreground/10 text-foreground font-black py-5 rounded-2xl flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02] uppercase tracking-widest text-xs shadow-xl"
+            >
+              <CreditCard className="w-5 h-5" /> Secure Checkout
             </button>
           </div>
         </div>
@@ -147,6 +243,47 @@ const VehicleDetails = ({ vehicles }) => {
         onClose={() => setIsPaymentOpen(false)} 
         vehicleName={vehicle.name} 
         price={vehicle.price} 
+      />
+      <ContactSellerForm 
+        isOpen={isContactSellerOpen} 
+        onClose={() => setIsContactSellerOpen(false)} 
+        vehicleName={vehicle.name} 
+      />
+      <BookTestDriveForm 
+        isOpen={isBookTestDriveOpen} 
+        onClose={() => setIsBookTestDriveOpen(false)} 
+        vehicleName={vehicle.name} 
+      />
+
+      {similarVehicles.length > 0 && (
+        <div className="mt-20">
+          <h2 className="text-4xl md:text-5xl font-black italic tracking-tighter mb-10 uppercase leading-none text-foreground text-center">
+            <span className="text-accent">Similar</span> Rides
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {similarVehicles.map((similarVehicle) => (
+              <VehicleCard 
+                key={similarVehicle.id} 
+                vehicle={similarVehicle} 
+                onCompare={handleCompare}
+                isCompared={compareList.includes(similarVehicle.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <CompareBar 
+        selectedVehicles={selectedToCompare} 
+        onRemove={handleCompare} 
+        onClear={() => setCompareList([])}
+        onCompare={() => setShowCompareModal(true)}
+      />
+
+      <CompareModal 
+        isOpen={showCompareModal}
+        onClose={() => setShowCompareModal(false)}
+        vehicles={selectedToCompare}
       />
     </div>
   );

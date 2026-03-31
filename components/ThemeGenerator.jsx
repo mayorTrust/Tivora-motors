@@ -29,7 +29,7 @@ const ThemeGenerator = () => {
     if (!prompt.trim()) return;
     setIsGenerating(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI(import.meta.env.VITE_GEMINI_API_KEY);
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: `Generate a UI theme color palette for a car dealership webapp based on the following mood: "${prompt}". 

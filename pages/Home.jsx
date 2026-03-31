@@ -1,10 +1,64 @@
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronRight, Star, Shield, Zap, Award, Globe } from 'lucide-react';
 import VehicleCard from '../components/VehicleCard';
+import CompareBar from '../components/CompareBar';
+import CompareModal from '../components/CompareModal';
+import { useWishlist } from '../hooks/useWishlist';
 
 const Home = ({ featuredVehicles }) => {
+  const { wishlist: globalWishlist, toggleWishlist } = useWishlist();
+
+  // State for compare feature
+  const [compareList, setCompareList] = useState([]);
+  const [showCompareModal, setShowCompareModal] = useState(false);
+
+  // CIPHER Event Listeners
+  React.useEffect(() => {
+    const handleVoiceWishlist = (e) => {
+      const { id, action } = e.detail;
+      const alreadyIn = globalWishlist.includes(id);
+      if ((action === 'add' && !alreadyIn) || (action === 'remove' && alreadyIn)) {
+        toggleWishlist(id);
+      }
+    };
+    
+    const handleVoiceCompare = (e) => {
+      const { ids } = e.detail;
+      setCompareList(ids);
+      setShowCompareModal(true);
+    };
+
+    window.addEventListener('tivora-manage-wishlist', handleVoiceWishlist);
+    window.addEventListener('tivora-compare-vehicles', handleVoiceCompare);
+    
+    return () => {
+      window.removeEventListener('tivora-manage-wishlist', handleVoiceWishlist);
+      window.removeEventListener('tivora-compare-vehicles', handleVoiceCompare);
+    };
+  }, [globalWishlist, toggleWishlist]);
+
+  const handleCompare = (vehicleId) => {
+    setCompareList(prev => {
+      if (prev.includes(vehicleId)) {
+        return prev.filter(id => id !== vehicleId);
+      }
+      if (prev.length >= 4) {
+        alert("Maximum 4 vehicles can be compared at once.");
+        return prev;
+      }
+      return [...prev, vehicleId];
+    });
+  };
+
+  const selectedToCompare = useMemo(() => {
+    // We need all vehicles to filter from, but here we only have featured.
+    // However, comparison usually happens within the same context.
+    // In a real app, we might need the full inventory here or just filter from featured.
+    return featuredVehicles.filter(v => compareList.includes(v.id));
+  }, [featuredVehicles, compareList]);
+
   return (
     <div className="w-full">
       {/* Hero Section */}
@@ -26,10 +80,10 @@ const Home = ({ featuredVehicles }) => {
               <span className="text-[9px] font-black uppercase tracking-[0.3em] text-foreground/80">PREMIUM AUTO SPECIALIST</span>
             </div>
             <h1 className="text-5xl sm:text-7xl lg:text-9xl font-black italic tracking-tighter leading-[0.85] mb-8 animate-in fade-in slide-in-from-left duration-700 uppercase text-foreground">
-              TRUST <span className="text-accent block drop-shadow-2xl">MOTORS.</span>
+              TIVORA <span className="text-accent block drop-shadow-2xl">MOTORS.</span>
             </h1>
             <p className="text-lg sm:text-xl lg:text-2xl text-foreground/60 mb-10 max-w-lg leading-relaxed animate-in fade-in slide-in-from-left duration-1000">
-              High-performance engineering meets world-class curation at TRUST MOTORS. Find the machine that moves you.
+              High-performance engineering meets world-class curation at TIVORA MOTORS. Find the machine that moves you.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 animate-in fade-in slide-in-from-bottom-4 duration-1000">
               <Link
@@ -63,7 +117,7 @@ const Home = ({ featuredVehicles }) => {
               { label: 'Exotics Delivered', value: '1.2K+' },
               { label: 'Specialists', value: '30' },
               { label: 'Awards Won', value: '12' },
-              { label: 'Trust Rate', value: '99%' },
+              { label: 'Reputation', value: '99%' },
             ].map((stat) => (
               <div key={stat.label} className="text-center group border-r border-foreground/5 last:border-none">
                 <div className="text-4xl md:text-6xl font-black text-foreground mb-2 group-hover:text-accent transition-colors duration-500 tabular-nums">{stat.value}</div>
@@ -91,12 +145,17 @@ const Home = ({ featuredVehicles }) => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
           {featuredVehicles.slice(0, 4).map((vehicle) => (
-            <VehicleCard key={vehicle.id} vehicle={vehicle} />
+            <VehicleCard 
+              key={vehicle.id} 
+              vehicle={vehicle} 
+              onCompare={handleCompare}
+              isCompared={compareList.includes(vehicle.id)}
+            />
           ))}
         </div>
       </section>
 
-      {/* THE BLUEPRINT - KAIA INTEGRATION MENTION */}
+      {/* THE BLUEPRINT - CIPHER INTEGRATION MENTION */}
       <section className="py-24 sm:py-40 relative bg-grid overflow-hidden border-t border-foreground/5">
         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-background via-transparent to-background pointer-events-none" />
         
@@ -109,7 +168,7 @@ const Home = ({ featuredVehicles }) => {
             <div className="lg:col-span-5">
               <span className="text-accent font-black uppercase tracking-[0.4em] text-[10px] mb-6 block">Our Philosophy</span>
               <h2 className="text-5xl sm:text-7xl font-black mb-8 tracking-tighter italic uppercase leading-[0.9] text-foreground">THE <br/><span className="text-accent">BLUEPRINT.</span></h2>
-              <p className="text-foreground/60 text-lg mb-10 leading-relaxed">We don't just sell vehicles. We engineer trust through a proprietary verification process that ensures every machine leaving our showroom is in its peak performance state.</p>
+              <p className="text-foreground/60 text-lg mb-10 leading-relaxed">We don't just sell vehicles. We engineer confidence through a proprietary verification process that ensures every machine leaving our showroom is in its peak performance state.</p>
               
               <div className="space-y-6">
                 <div className="flex gap-4 p-4 glass-card rounded-2xl group hover:bg-accent/5 transition-all cursor-default">
@@ -126,8 +185,8 @@ const Home = ({ featuredVehicles }) => {
                     <Globe className="w-6 h-6" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-foreground uppercase text-sm mb-1">KAIA ASSISTANCE</h4>
-                    <p className="text-xs text-foreground/50">Our Kinetic AI Assistant manages your showroom experience.</p>
+                    <h4 className="font-bold text-foreground uppercase text-sm mb-1">CIPHER ASSISTANCE</h4>
+                    <p className="text-xs text-foreground/50">Our Cyber Intelligence Protocol manages your showroom experience.</p>
                   </div>
                 </div>
               </div>
@@ -182,6 +241,19 @@ const Home = ({ featuredVehicles }) => {
           </div>
         </div>
       </section>
+
+      <CompareBar 
+        selectedVehicles={selectedToCompare} 
+        onRemove={handleCompare} 
+        onClear={() => setCompareList([])}
+        onCompare={() => setShowCompareModal(true)}
+      />
+
+      <CompareModal 
+        isOpen={showCompareModal}
+        onClose={() => setShowCompareModal(false)}
+        vehicles={selectedToCompare}
+      />
     </div>
   );
 };
