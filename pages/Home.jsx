@@ -79,7 +79,7 @@ const Home = ({ featuredVehicles }) => {
               <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
               <span className="text-[9px] font-black uppercase tracking-[0.3em] text-foreground/80">PREMIUM AUTO SPECIALIST</span>
             </div>
-            <h1 className="text-5xl sm:text-7xl lg:text-9xl font-black italic tracking-tighter leading-[0.85] mb-8 animate-in fade-in slide-in-from-left duration-700 uppercase text-foreground">
+            <h1 className="text-4xl sm:text-7xl lg:text-9xl font-black italic tracking-tighter leading-[0.85] mb-8 animate-in fade-in slide-in-from-left duration-700 uppercase text-foreground">
               TIVORA <span className="text-accent block drop-shadow-2xl">MOTORS.</span>
             </h1>
             <p className="text-lg sm:text-xl lg:text-2xl text-foreground/60 mb-10 max-w-lg leading-relaxed animate-in fade-in slide-in-from-left duration-1000">

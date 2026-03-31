@@ -138,13 +138,13 @@ export const LoadingScreen = ({ onComplete }) => {
 
         {/* Branding Section */}
         <div ref={textRef} className="text-center">
-          <h1 className="text-5xl md:text-7xl font-black tracking-[0.8em] text-white uppercase mb-4 glitch-text">
+          <h1 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-[0.4em] sm:tracking-[0.8em] text-white uppercase mb-4 glitch-text">
             TIVORA
           </h1>
-          <div className="flex items-center justify-center gap-6 text-[#00f2ff] text-[12px] tracking-[0.5em] uppercase font-bold opacity-80">
-            <span className="w-12 h-[1px] bg-[#00f2ff]/30" />
+          <div className="flex items-center justify-center gap-3 sm:gap-6 text-[#00f2ff] text-[10px] sm:text-[12px] tracking-[0.3em] sm:tracking-[0.5em] uppercase font-bold opacity-80">
+            <span className="hidden sm:block w-12 h-[1px] bg-[#00f2ff]/30" />
             Motorsports Dynamics
-            <span className="w-12 h-[1px] bg-[#00f2ff]/30" />
+            <span className="hidden sm:block w-12 h-[1px] bg-[#00f2ff]/30" />
           </div>
         </div>
       </div>
