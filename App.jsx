@@ -1,8 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { db } from './lib/firebase';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -15,15 +16,14 @@ import Login from './pages/Login';
 import Signup from './pages/Signup'; 
 import UserDashboard from './pages/UserDashboard'; 
 import VoiceControl from './components/VoiceControl';
-import ThemeGenerator from './components/ThemeGenerator';
-import QuantumAnalyst from './components/QuantumAnalyst';
-import DreamMachine from './components/DreamMachine';
-import MotionStudio from './components/MotionStudio';
+import ChatBot from './components/ChatBot';
+import ActivityTicker from './components/ActivityTicker';
 import Logo from './components/Logo.jsx';
 import Cursor from './components/Cursor';
 import { LoadingScreen } from './components/Loading.jsx';
-import { INITIAL_VEHICLES } from './constants';
-import { AuthProvider } from './hooks/useAuth.jsx';
+import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
+import { CartProvider } from './hooks/useCart.jsx';
+import Cart from './pages/Cart';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -45,27 +45,74 @@ const PageTransition = ({ children }) => {
   return <div ref={elementRef}>{children}</div>;
 };
 
+// Protected Admin Route
+const AdminRoute = ({ vehicles, onAdd, onUpdate, onDelete }) => {
+  const { user, loading } = useAuth();
+  const navigate = useLocation();
+
+  if (loading) return null;
+  if (!user || user.email !== 'admin@tivoramotors.com') {
+    return (
+      <div className="pt-40 text-center min-h-screen bg-background flex flex-col items-center">
+        <h2 className="text-4xl font-black italic tracking-tighter uppercase text-white mb-6">Access <span className="text-accent">Restricted</span></h2>
+        <p className="text-gray-500 font-medium mb-8">Unauthorized personnel detected. System lockdown engaged.</p>
+        <Link to="/" className="bg-accent text-black px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px]">Return to Sector 0</Link>
+      </div>
+    );
+  }
+
+  return <Admin vehicles={vehicles} onAdd={onAdd} onUpdate={onUpdate} onDelete={onDelete} />;
+};
+
 const App = () => {
   const [loading, setLoading] = useState(true);
-  const [vehicles, setVehicles] = useState(() => {
-    try {
-      const saved = localStorage.getItem('tivora_rides_inventory');
-      return saved ? JSON.parse(saved) : INITIAL_VEHICLES;
-    } catch (e) {
-      console.error("Failed to parse inventory from localStorage", e);
-      return INITIAL_VEHICLES;
-    }
-  });
+  const [vehicles, setVehicles] = useState([]);
+  const location = useLocation();
 
   useEffect(() => {
-    localStorage.setItem('tivora_rides_inventory', JSON.stringify(vehicles));
-  }, [vehicles]);
+    // Listen to Firestore
+    const unsubscribe = onSnapshot(collection(db, 'vehicles'), (snapshot) => {
+      const vehicleData = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id
+      }));
+      setVehicles(vehicleData);
+    }, (error) => {
+      console.error("Firestore Error:", error);
+    });
 
-  const handleAddVehicle = (newVehicle) => setVehicles([...vehicles, newVehicle]);
-  const handleUpdateVehicle = (updatedVehicle) => setVehicles(vehicles.map(v => v.id === updatedVehicle.id ? updatedVehicle : v));
-  const handleDeleteVehicle = (id) => {
-    if (confirm('Delete this listing?')) setVehicles(vehicles.filter(v => v.id !== id));
+    return () => unsubscribe();
+  }, []);
+
+  const handleAddVehicle = async (newVehicle) => {
+    try {
+      await addDoc(collection(db, 'vehicles'), newVehicle);
+    } catch (e) {
+      console.error("Error adding vehicle: ", e);
+    }
   };
+
+  const handleUpdateVehicle = async (updatedVehicle) => {
+    try {
+      const vehicleRef = doc(db, 'vehicles', updatedVehicle.id);
+      const { id, ...data } = updatedVehicle;
+      await updateDoc(vehicleRef, data);
+    } catch (e) {
+      console.error("Error updating vehicle: ", e);
+    }
+  };
+
+  const handleDeleteVehicle = async (id) => {
+    if (confirm('Delete this listing?')) {
+      try {
+        await deleteDoc(doc(db, 'vehicles', id));
+      } catch (e) {
+        console.error("Error deleting vehicle: ", e);
+      }
+    }
+  };
+
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
 
   return (
     <>
@@ -77,30 +124,31 @@ const App = () => {
       ) : (
         <div className="opacity-100 transition-opacity duration-1000">
           <AuthProvider>
-            <div className="min-h-screen flex flex-col bg-grid">
-              <Navbar Logo={Logo} />
-              <main className="flex-grow">
-                <PageTransition>
-                    <Routes>
-                      <Route path="/" element={<Home featuredVehicles={vehicles.filter(v => v.featured)} />} />
-                      <Route path="/inventory" element={<Inventory vehicles={vehicles} />} />
-                      <Route path="/vehicle/:id" element={<VehicleDetails vehicles={vehicles} />} />
-                      <Route path="/about" element={<About />} />
-                      <Route path="/contact" element={<Contact />} />
-                      <Route path="/admin" element={<Admin vehicles={vehicles} onAdd={handleAddVehicle} onUpdate={handleUpdateVehicle} onDelete={handleDeleteVehicle} />} />
-                      <Route path="/login" element={<Login />} />
-                      <Route path="/signup" element={<Signup />} />
-                      <Route path="/dashboard" element={<UserDashboard vehicles={vehicles} />} />
-                    </Routes>
-                </PageTransition>
-              </main>          
-              <VoiceControl />
-              <ThemeGenerator />
-              <DreamMachine />
-              <MotionStudio />
-              <QuantumAnalyst />
-              <Footer />
-            </div>
+            <CartProvider>
+              <div className="min-h-screen flex flex-col bg-grid">
+                <Navbar Logo={Logo} />
+                <main className="flex-grow">
+                  <PageTransition>
+                      <Routes>
+                        <Route path="/" element={<Home featuredVehicles={vehicles.filter(v => v.featured)} />} />
+                        <Route path="/inventory" element={<Inventory vehicles={vehicles} />} />
+                        <Route path="/vehicle/:id" element={<VehicleDetails vehicles={vehicles} />} />
+                        <Route path="/about" element={<About />} />
+                        <Route path="/contact" element={<Contact />} />
+                        <Route path="/admin" element={<AdminRoute vehicles={vehicles} onAdd={handleAddVehicle} onUpdate={handleUpdateVehicle} onDelete={handleDeleteVehicle} />} />
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/signup" element={<Signup />} />
+                        <Route path="/dashboard" element={<UserDashboard vehicles={vehicles} />} />
+                        <Route path="/cart" element={<Cart />} />
+                      </Routes>
+                  </PageTransition>
+                </main>          
+                <VoiceControl vehicles={vehicles} />
+                <ChatBot vehicles={vehicles} />
+                <ActivityTicker />
+                {!isAuthPage && <Footer />}
+              </div>
+            </CartProvider>
           </AuthProvider>
         </div>
       )}

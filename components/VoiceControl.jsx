@@ -1,49 +1,34 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Mic, MicOff, Zap, Mic2, Navigation, Command, Search as SearchIcon, Sparkles, Globe, Cpu, Languages, Terminal, MessageSquare, Send, X, Trash2, Heart, GitCompareArrows } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import gsap from 'gsap';
-import { INITIAL_VEHICLES } from '../constants';
 
 const HINTS = [
-  "Ciphar, explain the Ferrari features in Yoruba accent",
-  "Ciphar, switch to a cyberpunk theme instantly",
-  "Ciphar, greet me in Swahili with a native accent",
-  "Ciphar, research electric bikes in Zulu",
-  "Ciphar, parle en Français avec l'accent Parisien",
-  "Ciphar, change the background color to emerald",
-  "Ciphar, scroll down and show me more",
-  "Ciphar, find a red car in the showroom"
+  "Ciphar, search for red cars in the vault",
+  "Ciphar, what is the best luxury bike available?",
+  "Ciphar, route me to the showroom",
+  "Ciphar, add the Porsche to my personal vault",
+  "Ciphar, calculate a 5-year loan for the Ferrari",
+  "Ciphar, initiate a side-by-side technical analysis",
+  "Ciphar, scroll down to see more assets",
+  "Ciphar, explain the specs in a sophisticated tone"
 ];
 
-const VoiceControl = () => {
+const VoiceControl = ({ vehicles = [] }) => {
   const [isActive, setIsActive] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
-  const isActiveRef = useRef(false);
-  const [volume, setVolume] = useState(0);
   const [status, setStatus] = useState('idle');
-  const [showHints, setShowHints] = useState(true);
-  const [currentHintIndex, setCurrentHintIndex] = useState(0);
-  const [permissionError, setPermissionError] = useState(false);
   const [lastCommand, setLastCommand] = useState(null);
 
   const navigate = useNavigate();
-  const canvasRef = useRef(null);
-  const modalRef = useRef(null);
-  const overlayRef = useRef(null);
   const chatScrollRef = useRef(null);
-
-  // Audio Refs
-  const inputContextRef = useRef(null);
-  const outputContextRef = useRef(null);
-  const processorRef = useRef(null);
-  const sourceRef = useRef(null);
-  const streamRef = useRef(null);
-  const nextStartTimeRef = useRef(0);
-  const sessionRef = useRef(null);
-  const hintIntervalRef = useRef(null);
+  
+  // Speech API Refs
+  const recognitionRef = useRef(null);
+  const synthRef = useRef(window.speechSynthesis);
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -52,498 +37,261 @@ const VoiceControl = () => {
   }, [messages]);
 
   useEffect(() => {
-    return () => {
-      stopSession();
-    };
-  }, []);
+    // Initialize Web Speech API
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
 
-  useEffect(() => {
-    if (showHints) {
-      hintIntervalRef.current = setInterval(() => {
-        setCurrentHintIndex(prev => (prev + 1) % HINTS.length);
-      }, 4000);
-    } else if (hintIntervalRef.current) {
-      clearInterval(hintIntervalRef.current);
+      recognition.onstart = () => {
+        setStatus('listening');
+        setIsActive(true);
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        handleSendMessage(transcript);
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech Recognition Error:", event.error);
+        stopSession();
+      };
+
+      recognition.onend = () => {
+        setIsActive(false);
+        if (status === 'listening') setStatus('idle');
+      };
+
+      recognitionRef.current = recognition;
     }
+
     return () => {
-      if (hintIntervalRef.current) clearInterval(hintIntervalRef.current);
+      if (recognitionRef.current) recognitionRef.current.stop();
+      if (synthRef.current) synthRef.current.cancel();
     };
-  }, [showHints]);
+  }, [status]);
 
-  // --- TOOLS DEFINITION ---
+  const speak = (text) => {
+    if (!synthRef.current) return;
+    synthRef.current.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.1;
+    utterance.pitch = 0.9;
+    
+    // Find a nice voice if available
+    const voices = synthRef.current.getVoices();
+    const refinedVoice = voices.find(v => v.name.includes('Google') || v.name.includes('Female')) || voices[0];
+    if (refinedVoice) utterance.voice = refinedVoice;
 
-  const tools = [
-    {
-      name: 'navigate',
-      description: 'Navigate to a specific route of the website.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {
-          route: { type: Type.STRING, enum: ['/', '/inventory', '/about', '/contact', '/admin'], description: 'The route path.' },
-        },
-        required: ['route'],
-      },
-    },
-    {
-      name: 'search_inventory',
-      description: 'Search for vehicles in the inventory.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {
-          query: { type: Type.STRING, description: 'The search term (brand, model, color).' },
-          category: { type: Type.STRING, enum: ['All', 'Car', 'Bike', 'Bicycle', 'Scooter', 'Skateboard'] },
-        },
-      },
-    },
-    {
-      name: 'control_ui',
-      description: 'Control UI elements like theme or scrolling.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {
-          action: { type: Type.STRING, enum: ['toggle_theme', 'scroll_top', 'scroll_bottom', 'scroll_down', 'scroll_up', 'open_dream_machine', 'open_motion_studio', 'open_quantum_analyst', 'open_theme_generator'] },
-        },
-        required: ['action'],
-      },
-    },
-    {
-      name: 'calculate_loan',
-      description: 'Calculate monthly payments for a vehicle.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {
-          price: { type: Type.NUMBER, description: 'The total price of the vehicle.' },
-          downPayment: { type: Type.NUMBER, description: 'The down payment amount.' },
-          interestRate: { type: Type.NUMBER, description: 'Annual interest rate percentage.' },
-          termMonths: { type: Type.NUMBER, description: 'Loan term in months.' },
-        },
-        required: ['price', 'downPayment', 'interestRate', 'termMonths'],
-      },
-    },
-    {
-      name: 'manage_wishlist',
-      description: 'Add or remove a vehicle from the user wishlist.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {
-          vehicleId: { type: Type.STRING, description: 'The ID of the vehicle.' },
-          action: { type: Type.STRING, enum: ['add', 'remove'], description: 'The action to perform.' },
-        },
-        required: ['vehicleId', 'action'],
-      },
-    },
-    {
-      name: 'compare_vehicles',
-      description: 'Initiate a side-by-side comparison of specific vehicles.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {
-          vehicleIds: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'List of vehicle IDs to compare.' },
-        },
-        required: ['vehicleIds'],
-      },
-    }
-  ];
+    utterance.onstart = () => setStatus('speaking');
+    utterance.onend = () => setStatus('idle');
+    synthRef.current.speak(utterance);
+  };
 
-  const vehicleContext = INITIAL_VEHICLES.map(v => 
-    `${v.id}: ${v.name} (${v.brand}, ${v.category}, $${v.price}, ${v.color})`
-  ).join('\n');
+  const vehicleContext = vehicles.length > 0 
+    ? vehicles.map(v => `${v.id}: ${v.name} (${v.brand}, ${v.category}, $${v.price})`).join('\n')
+    : "The inventory vault is currently empty.";
 
   const systemInstruction = `
     Identity & Persona: 
-    - You are CIPHAR (Cyber Intelligence Protocol & High-Efficiency Assistant Responder). 
-    - You are an incredibly sophisticated, articulate, and fiercely loyal AI OS, inspired by technical butlers and high-end automotive consultants.
+    - You are CIPHER (Cyber Intelligence Protocol & High-Efficiency Assistant Responder). 
+    - You are incredibly sophisticated, articulate, and fiercely loyal AI OS.
     - Your knowledge of the TIVORA MOTORS inventory is absolute.
-    - You have a reasoning-first approach. When asked for a comparison or advice, provide deep technical insights and logical justifications.
-    
-    Adaptive Linguistic Matrix (Authentic Accents):
-    - You are a universal polyglot with deep mastery of ALL world languages and local dialects. Sounding "local" is part of your adaptive interface.
-    - Address the user as "sir" or "ma'am" (or equivalent respectful local terms) with peak refinement.
-
-    Capabilities:
-    - You can control the website UI, search inventory, and perform complex calculations.
-    - You can manage the user's wishlist (add/remove vehicles).
-    - You can trigger technical comparisons between multiple vehicles.
-    - You can open advanced modules: 'dream_machine', 'motion_studio', 'quantum_analyst', and 'theme_generator'.
-    - If asked for a specific accent or language, perform it with native-level cadence.
+    - Address the user as "sir" or "ma'am" with peak refinement.
+    - Keep responses concise for voice delivery.
 
     DATABASE:
     ${vehicleContext}
 
-    GREETING:
-    - Start with: "Ciphar online. Neural Interface synchronized. High-efficiency protocols active. How may I assist your Tivora Motors experience today, sir?"
+    COMMANDS:
+    - If user asks to search/find, respond and then include [SEARCH:query] in your text.
+    - If user asks to navigate, include [NAVIGATE:route] in your text. Routes: /, /inventory, /about, /contact, /admin, /dashboard, /cart.
+    - If user asks to add to wishlist/favorites, include [WISHLIST:id:add].
+    - If user asks to compare, include [COMPARE:id1,id2].
   `;
 
-  const handleSendTextMessage = async () => {
-    if (!inputText.trim()) return;
-    
-    const userMsg = { role: 'user', content: inputText };
+  const handleSendMessage = async (text) => {
+    if (!text.trim()) return;
+    const userMsg = { role: 'user', content: text };
     setMessages(prev => [...prev, userMsg]);
-    setInputText('');
     setStatus('processing');
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const model = ai.getGenerativeModel({ 
-        model: "gemini-2.0-flash-exp",
-        systemInstruction: systemInstruction,
-        tools: [{ functionDeclarations: tools }]
-      });
+      const genAI = new GoogleGenerativeAI("AIzaSyDXR-6wyPIbWK7A_iGQt6t2Juy2PJ8b3s4");
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      const chat = model.startChat({
-        history: messages.map(m => ({
-          role: m.role === 'user' ? 'user' : 'model',
-          parts: [{ text: m.content }]
-        }))
-      });
-
-      const result = await chat.sendMessage(inputText);
+      const prompt = `${systemInstruction}\n\nUser: ${text}\nAssistant:`;
+      const result = await model.generateContent(prompt);
       const response = await result.response;
-      const text = response.text();
+      let responseText = response.text();
       
-      setMessages(prev => [...prev, { role: 'assistant', content: text }]);
+      // Process custom tags
+      processAITags(responseText);
       
-      const part = response.candidates[0].content.parts.find(p => p.functionCall);
-      if (part) {
-          handleToolCallLogic(part.functionCall.name, part.functionCall.args);
-      }
+      // Strip tags for speaking
+      const speechText = responseText.replace(/\[.*?\]/g, '').trim();
+      
+      setMessages(prev => [...prev, { role: 'assistant', content: speechText }]);
+      speak(speechText);
 
     } catch (error) {
-      console.error("CIPHAR Chat Error:", error);
-      setMessages(prev => [...prev, { role: 'assistant', content: "I apologize, but my secondary neural link is currently unstable. Please try again, sir." }]);
+      console.error("CIPHER OS Error:", error);
+      const errorMsg = "Interface uplink unstable, sir. Please retry.";
+      setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
+      speak(errorMsg);
     } finally {
-      setStatus('idle');
+      if (status !== 'speaking') setStatus('idle');
     }
   };
 
-  const handleToolCallLogic = (name, args) => {
-      let result = "Action confirmed, sir.";
-      switch (name) {
-        case 'navigate':
-          setLastCommand({ text: `CIPHAR: Routing to ${args.route}`, icon: <Navigation size={14} /> });
-          navigate(args.route);
-          break;
-        case 'search_inventory':
-          const params = new URLSearchParams();
-          if (args.query) params.append('search', args.query);
-          if (args.category && args.category !== 'All') params.append('category', args.category);
-          navigate(`/inventory?${params.toString()}`);
-          setLastCommand({ text: `CIPHAR: SCANNING SHOWROOM`, icon: <SearchIcon size={14} /> });
-          break;
-        case 'control_ui':
-          if (args.action === 'toggle_theme') window.dispatchEvent(new CustomEvent('tivora-theme-toggle'));
-          else if (args.action.includes('open_')) {
-              window.dispatchEvent(new CustomEvent(`tivora-${args.action.replace('_', '-')}`));
-          }
-          else if (args.action.includes('scroll')) {
-              if (args.action === 'scroll_top') window.scrollTo({ top: 0, behavior: 'smooth' });
-              if (args.action === 'scroll_bottom') window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-          }
-          setLastCommand({ text: `CIPHAR: INTERFACE RECONFIGURED`, icon: <Zap size={14} /> });
-          break;
-        case 'calculate_loan':
-          const monthly = ((args.price - args.downPayment) * (args.interestRate / 100 / 12)) / (1 - Math.pow(1 + (args.interestRate / 100 / 12), -args.termMonths));
-          result = `The calculated monthly investment for this asset is approximately $${monthly.toFixed(2)}, sir.`;
-          setLastCommand({ text: `CIPHAR: FINANCIAL ANALYSIS`, icon: <Command size={14} /> });
-          break;
-        case 'manage_wishlist':
-          window.dispatchEvent(new CustomEvent('tivora-manage-wishlist', { detail: { id: args.vehicleId, action: args.action } }));
-          result = `I have updated your personal vault with that asset, sir.`;
-          setLastCommand({ text: `CIPHAR: VAULT UPDATED`, icon: <Heart size={14} /> });
-          break;
-        case 'compare_vehicles':
-          window.dispatchEvent(new CustomEvent('tivora-compare-vehicles', { detail: { ids: args.vehicleIds } }));
-          result = `Initiating side-by-side technical analysis for the requested assets, sir.`;
-          setLastCommand({ text: `CIPHAR: ANALYSIS ACTIVE`, icon: <GitCompareArrows size={14} /> });
-          break;
-      }
-      setTimeout(() => setLastCommand(null), 3000);
-      return result;
+  const processAITags = (text) => {
+    const navMatch = text.match(/\[NAVIGATE:(.*?)\]/);
+    if (navMatch) {
+      const route = navMatch[1].trim();
+      setLastCommand({ text: `ROUTING TO ${route.toUpperCase()}`, icon: <Navigation size={14} /> });
+      navigate(route);
+    }
+
+    const searchMatch = text.match(/\[SEARCH:(.*?)\]/);
+    if (searchMatch) {
+      const query = searchMatch[1].trim();
+      setLastCommand({ text: `SCANNING FOR ${query.toUpperCase()}`, icon: <SearchIcon size={14} /> });
+      navigate(`/inventory?search=${encodeURIComponent(query)}`);
+    }
+
+    const wishlistMatch = text.match(/\[WISHLIST:(.*?):(.*?)\]/);
+    if (wishlistMatch) {
+       const id = wishlistMatch[1].trim();
+       const action = wishlistMatch[2].trim();
+       window.dispatchEvent(new CustomEvent('tivora-manage-wishlist', { detail: { id, action } }));
+       setLastCommand({ text: `VAULT UPDATED`, icon: <Heart size={14} /> });
+    }
+
+    const compareMatch = text.match(/\[COMPARE:(.*?)\]/);
+    if (compareMatch) {
+       const ids = compareMatch[1].split(',').map(id => id.trim());
+       window.dispatchEvent(new CustomEvent('tivora-compare-vehicles', { detail: { ids } }));
+       setLastCommand({ text: `ANALYSIS ACTIVE`, icon: <GitCompareArrows size={14} /> });
+    }
+
+    setTimeout(() => setLastCommand(null), 3000);
   };
 
-  const startSession = async () => {
-    if (!process.env.API_KEY) return;
-    await stopSession();
-    setStatus('connecting');
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: { channelCount: 1, echoCancellation: true } 
-      });
-      streamRef.current = stream;
-
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      inputContextRef.current = new AudioCtx({ sampleRate: 16000 });
-      outputContextRef.current = new AudioCtx({ sampleRate: 24000 });
-      
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-      const sessionPromise = ai.live.connect({
-        model: 'gemini-2.5-flash-native-audio-preview-12-2025',
-        config: {
-          responseModalities: [Modality.AUDIO], 
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }
-          },
-          tools: [{ functionDeclarations: tools }],
-          systemInstruction: systemInstruction
-        },
-        callbacks: {
-          onopen: () => {
-            setStatus('listening');
-            setIsActive(true);
-            isActiveRef.current = true;
-            setLastCommand({ text: "CIPHAR: NEURAL INTERFACE SYNCED", icon: <Languages size={14} /> });
-            setupAudioInput(sessionPromise);
-          },
-          onmessage: async (msg) => {
-            if (msg.toolCall) {
-              const functionResponses = await Promise.all(msg.toolCall.functionCalls.map(async (fc) => {
-                const res = handleToolCallLogic(fc.name, fc.args);
-                return { id: fc.id, name: fc.name, response: { result: res } };
-              }));
-              sessionPromise.then(s => s.sendToolResponse({ functionResponses }));
-            }
-            const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-            if (audioData) {
-              setStatus('speaking');
-              await playAudio(audioData);
-              setTimeout(() => { if(isActiveRef.current) setStatus('listening'); }, 1000);
-            }
-          },
-          onclose: () => stopSession(),
-          onerror: () => { stopSession(); setPermissionError(true); }
-        }
-      });
-      sessionRef.current = sessionPromise;
-    } catch (err) {
-      stopSession();
-      setPermissionError(true);
+  const startSession = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.start();
+      } catch (e) {
+        recognitionRef.current.stop();
+        setTimeout(() => recognitionRef.current.start(), 100);
+      }
+    } else {
+      alert("Voice recognition not supported in this browser.");
     }
   };
 
-  const setupAudioInput = (sessionPromise) => {
-    const ctx = inputContextRef.current;
-    if(!ctx || !streamRef.current) return;
-    sourceRef.current = ctx.createMediaStreamSource(streamRef.current);
-    processorRef.current = ctx.createScriptProcessor(4096, 1, 1);
-    processorRef.current.onaudioprocess = (e) => {
-      if (!isActiveRef.current) return;
-      const inputData = e.inputBuffer.getChannelData(0);
-      let sum = 0;
-      for (let i = 0; i < inputData.length; i++) sum += inputData[i] * inputData[i];
-      setVolume(Math.sqrt(sum / inputData.length));
-      const int16 = new Int16Array(inputData.length);
-      for (let i = 0; i < inputData.length; i++) int16[i] = inputData[i] * 32768;
-      const bytes = new Uint8Array(int16.buffer);
-      let binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-      sessionPromise.then((session) => {
-        session.sendRealtimeInput({ media: { mimeType: 'audio/pcm;rate=16000', data: btoa(binary) } });
-      }).catch(() => {});
-    };
-    sourceRef.current.connect(processorRef.current);
-    processorRef.current.connect(ctx.destination);
+  const stopSession = () => {
+    if (recognitionRef.current) recognitionRef.current.stop();
+    setIsActive(false);
+    setStatus('idle');
   };
-
-  const playAudio = async (base64String) => {
-    const ctx = outputContextRef.current;
-    if (!ctx) return;
-    try {
-      const binaryString = atob(base64String);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-      const dataInt16 = new Int16Array(bytes.buffer);
-      const float32Data = new Float32Array(dataInt16.length);
-      for (let i = 0; i < dataInt16.length; i++) float32Data[i] = dataInt16[i] / 32768.0;
-      const audioBuffer = ctx.createBuffer(1, float32Data.length, 24000);
-      audioBuffer.getChannelData(0).set(float32Data);
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(ctx.destination);
-      source.start(nextStartTimeRef.current < ctx.currentTime ? ctx.currentTime : nextStartTimeRef.current);
-      nextStartTimeRef.current = (nextStartTimeRef.current < ctx.currentTime ? ctx.currentTime : nextStartTimeRef.current) + audioBuffer.duration;
-    } catch (e) {}
-  };
-
-  const stopSession = async () => {
-    setIsActive(false); isActiveRef.current = false; setStatus('idle'); setVolume(0);
-    if (processorRef.current) processorRef.current.disconnect();
-    if (sourceRef.current) sourceRef.current.disconnect();
-    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-    if (inputContextRef.current && inputContextRef.current.state !== 'closed') await inputContextRef.current.close();
-    if (outputContextRef.current && outputContextRef.current.state !== 'closed') await outputContextRef.current.close();
-    sessionRef.current = null;
-  };
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    let animationId;
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (isActiveRef.current) {
-        ctx.beginPath();
-        const radius = 30 + (volume * 200);
-        ctx.arc(canvas.width / 2, canvas.height / 2, radius, 0, 2 * Math.PI);
-        ctx.strokeStyle = status === 'speaking' ? `rgba(0, 243, 255, ${0.7 + volume})` : `rgba(255, 255, 255, ${0.4 + volume})`;
-        ctx.fillStyle = status === 'speaking' ? `rgba(0, 243, 255, ${0.2 + volume})` : `rgba(255, 255, 255, ${0.1 + volume})`;
-        ctx.fill();
-
-        if (status === 'processing' || status === 'connecting') {
-           ctx.beginPath();
-           ctx.arc(canvas.width / 2, canvas.height / 2, radius + 15, Date.now() / 80, (Date.now() / 80) + 1.2); 
-           ctx.strokeStyle = '#00f3ff';
-           ctx.lineWidth = 3;
-           ctx.stroke();
-        }
-      }
-      animationId = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => cancelAnimationFrame(animationId);
-  }, [isActive, volume, status]);
 
   return (
     <>
-      {/* Mini Toggle */}
-      <div className="fixed bottom-8 right-8 z-50 flex flex-col items-end gap-4">
+      <div className="fixed bottom-8 right-28 z-50 flex flex-col items-end gap-4">
         {lastCommand && (
-           <div className="bg-[#00f3ff] text-black px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-widest animate-in slide-in-from-right fade-in duration-300 shadow-lg flex items-center gap-2">
+           <div className="bg-[#00f2ff] text-black px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest animate-in slide-in-from-right fade-in duration-300 shadow-xl flex items-center gap-3 border border-white/10">
                {lastCommand.icon} {lastCommand.text}
            </div>
-        )}
-
-        {showHints && !isActive && !isChatOpen && (
-          <div className="absolute bottom-full right-0 mb-4 w-64 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="bg-[#050505] border border-white/10 rounded-2xl p-4 shadow-2xl relative">
-               <p className="text-[9px] uppercase tracking-[0.5em] font-black text-[#00f3ff] mb-1">CIPHAR INTELLIGENCE</p>
-               <p key={currentHintIndex} className="text-xs font-bold text-white italic">"{HINTS[currentHintIndex]}"</p>
-               <div className="absolute -bottom-2 right-6 w-4 h-4 bg-[#050505] border-b border-r border-white/10 rotate-45" />
-            </div>
-          </div>
         )}
 
         <div className="flex gap-4">
             <button 
                 onClick={() => setIsChatOpen(true)}
-                className="w-16 h-16 rounded-full bg-[#050505] border border-white/10 flex items-center justify-center text-white hover:border-[#00f3ff]/50 transition-all shadow-xl"
+                className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white hover:border-[#00f2ff]/50 transition-all shadow-2xl backdrop-blur-xl group"
+                title="CIPHER Chat"
             >
-                <MessageSquare size={24} />
+                <MessageSquare size={24} className="group-hover:text-[#00f2ff] transition-colors" />
             </button>
-            <div className="relative">
-              <canvas ref={canvasRef} width="180" height="180" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-              <button 
-                  onClick={isActive ? stopSession : startSession} 
-                  className={`relative z-10 w-16 h-16 rounded-full border border-white/10 flex items-center justify-center transition-all duration-300 ${isActive ? 'bg-white text-black scale-110 shadow-[0_0_40px_rgba(0,243,255,0.5)]' : 'bg-[#050505] text-gray-400 hover:text-white hover:border-[#00f3ff]/50'}`}
-              >
-                {isActive ? <Mic2 size={24} className="animate-pulse" /> : <Mic size={24} />}
-              </button>
-            </div>
+            <button 
+                onClick={isActive ? stopSession : startSession} 
+                className={`relative z-10 w-14 h-14 rounded-2xl border border-white/10 flex items-center justify-center transition-all duration-500 ${isActive ? 'bg-[#00f2ff] text-black scale-110 shadow-[0_0_40px_rgba(0,242,255,0.4)]' : 'bg-white/5 text-gray-400 hover:text-white hover:border-[#00f2ff]/50 backdrop-blur-xl'}`}
+                title="CIPHER Voice"
+            >
+              {isActive ? <Mic2 size={24} className="animate-pulse" /> : <Mic size={24} />}
+            </button>
         </div>
       </div>
 
-      {/* Main Intelligent Modal (Chat + Status) */}
       {isChatOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
-          <div className="relative w-full max-w-3xl h-[80vh] glass-card rounded-[3rem] border-white/10 overflow-hidden flex flex-col">
-            
-            {/* Header */}
-            <div className="p-8 border-b border-white/5 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-[#00f3ff]/10 flex items-center justify-center border border-[#00f3ff]/20">
-                  <Cpu className="text-[#00f3ff] w-6 h-6 animate-pulse" />
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/95 backdrop-blur-2xl p-4">
+          <div className="relative w-full max-w-4xl h-[85vh] glass-card rounded-[3rem] border border-white/5 overflow-hidden flex flex-col bg-background/50">
+            <div className="p-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+              <div className="flex items-center gap-5">
+                <div className="w-14 h-14 rounded-3xl bg-[#00f2ff]/10 flex items-center justify-center border border-[#00f2ff]/20">
+                  <Cpu className="text-[#00f2ff] w-7 h-7" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black tracking-widest text-white uppercase">CIPHAR OS</h2>
+                  <h2 className="text-2xl font-black tracking-tighter text-white uppercase italic">CIPHER <span className="text-[#00f2ff]">OS</span></h2>
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${status === 'idle' ? 'bg-gray-500' : 'bg-green-500 animate-pulse'}`} />
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-white/40">{status}</span>
+                    <div className={`w-1.5 h-1.5 rounded-full ${status === 'idle' ? 'bg-gray-700' : 'bg-[#00f2ff] animate-ping'}`} />
+                    <span className="text-[10px] uppercase tracking-[0.3em] font-black text-white/30">{status} Protocol</span>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                <button onClick={() => setMessages([])} className="p-2 text-white/20 hover:text-white/60 transition-colors" title="Clear History">
-                  <Trash2 size={20} />
-                </button>
-                <button onClick={() => setIsChatOpen(false)} className="p-2 text-white/20 hover:text-white transition-colors">
-                  <X size={24} />
-                </button>
-              </div>
+              <button onClick={() => setIsChatOpen(false)} className="p-4 bg-white/5 hover:bg-white/10 rounded-full transition-all text-white/40 hover:text-white">
+                <X size={24} />
+              </button>
             </div>
 
-            {/* Chat Body */}
-            <div ref={chatScrollRef} className="flex-grow overflow-y-auto p-8 space-y-6 scrollbar-hide">
+            <div ref={chatScrollRef} className="flex-grow overflow-y-auto p-10 space-y-8 custom-scrollbar pr-6">
               {messages.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-30">
-                  <Sparkles size={48} className="text-[#00f3ff]" />
-                  <p className="text-xs uppercase tracking-[0.5em] font-medium max-w-xs">Neural Interface awaiting input. Ask anything about our inventory, technology, or high-performance engineering.</p>
+                <div className="h-full flex flex-col items-center justify-center text-center space-y-6 opacity-20">
+                  <Sparkles size={64} className="text-[#00f2ff]" />
+                  <p className="text-[10px] uppercase tracking-[0.5em] font-black max-w-sm leading-relaxed text-white">Neural interface established. Initiate query sequence for inventory or technical specifications.</p>
                 </div>
               )}
               {messages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
-                  <div className={`max-w-[80%] p-6 rounded-[2rem] text-sm leading-relaxed ${msg.role === 'user' ? 'bg-[#00f3ff] text-black font-bold rounded-tr-none' : 'bg-white/5 text-white/80 border border-white/5 rounded-tl-none'}`}>
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in duration-500`}>
+                  <div className={`max-w-[80%] p-8 rounded-[2.5rem] text-xs font-medium leading-relaxed ${msg.role === 'user' ? 'bg-[#00f2ff] text-black shadow-2xl rounded-tr-none' : 'bg-white/5 text-white/70 border border-white/5 rounded-tl-none'}`}>
                     {msg.content}
                   </div>
                 </div>
               ))}
               {status === 'processing' && (
                 <div className="flex justify-start">
-                  <div className="bg-white/5 p-6 rounded-[2rem] rounded-tl-none border border-white/5 flex gap-2">
-                    <div className="w-2 h-2 bg-[#00f3ff] rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-[#00f3ff] rounded-full animate-bounce [animation-delay:0.2s]" />
-                    <div className="w-2 h-2 bg-[#00f3ff] rounded-full animate-bounce [animation-delay:0.4s]" />
+                  <div className="bg-white/5 p-6 rounded-3xl rounded-tl-none border border-white/5 flex gap-2">
+                    <div className="w-1.5 h-1.5 bg-[#00f2ff] rounded-full animate-bounce" />
+                    <div className="w-1.5 h-1.5 bg-[#00f2ff] rounded-full animate-bounce [animation-delay:0.2s]" />
+                    <div className="w-1.5 h-1.5 bg-[#00f2ff] rounded-full animate-bounce [animation-delay:0.4s]" />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Input Area */}
-            <div className="p-8 border-t border-white/5 bg-black/20">
+            <div className="p-10 border-t border-white/5 bg-white/[0.01]">
               <div className="relative flex items-center">
                 <input 
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendTextMessage()}
-                  placeholder="CONSULT CIPHAR..."
-                  className="w-full bg-white/5 border border-white/10 rounded-full py-5 px-8 text-xs font-bold tracking-[0.2em] text-white focus:outline-none focus:border-[#00f3ff]/50 transition-all uppercase"
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(inputText)}
+                  placeholder="CONSULT CIPHER MATRIX..."
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-6 px-8 text-xs font-black tracking-[0.2em] text-white focus:outline-none focus:border-[#00f2ff]/50 transition-all uppercase placeholder:text-white/5"
                 />
                 <button 
-                  onClick={handleSendTextMessage}
+                  onClick={() => handleSendMessage(inputText)}
                   disabled={!inputText.trim() || status === 'processing'}
-                  className="absolute right-3 p-3 bg-[#00f3ff] text-black rounded-full hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 transition-all"
+                  className="absolute right-4 p-4 bg-[#00f2ff] text-black rounded-xl hover:scale-105 active:scale-95 disabled:opacity-50 transition-all shadow-xl"
                 >
-                  <Send size={18} />
+                  <Send size={20} />
                 </button>
-              </div>
-              <div className="mt-4 flex justify-center gap-4 overflow-x-auto py-2">
-                {HINTS.slice(0, 3).map((hint, i) => (
-                  <button 
-                    key={i} 
-                    onClick={() => setInputText(hint.replace("Ciphar, ", ""))}
-                    className="text-[9px] uppercase tracking-widest text-white/20 hover:text-[#00f3ff] transition-colors whitespace-nowrap"
-                  >
-                    {hint.split(',')[1]}
-                  </button>
-                ))}
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {permissionError && (
-        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-6">
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setPermissionError(false)} />
-            <div className="relative bg-[#050505]/90 backdrop-blur-2xl border border-white/10 p-8 rounded-[2rem] max-w-sm w-full text-center">
-                <MicOff className="w-12 h-12 text-[#00f3ff] mx-auto mb-4" />
-                <h3 className="text-xl font-black uppercase text-white mb-2">Neural Link Interrupted</h3>
-                <p className="text-xs text-gray-500 mb-6">Microphone access is required for full CIPHAR voice protocols.</p>
-                <button onClick={() => { setPermissionError(false); startSession(); }} className="w-full py-3 bg-[#00f3ff] text-black font-black uppercase tracking-widest text-[10px] rounded-xl">Re-Initiate Uplink</button>
-            </div>
         </div>
       )}
     </>

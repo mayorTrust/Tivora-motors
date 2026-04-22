@@ -1,152 +1,102 @@
-
-import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Send, MessageCircle } from 'lucide-react';
+import React from 'react';
+import { Mail, Phone, MapPin, MessageSquare, Send, Globe, Shield } from 'lucide-react';
 
 const Contact = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    subject: 'General Inquiry',
-    message: ''
-  });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    alert('Thank you for your message! Our team will get back to you within 24 hours.');
-    setFormData({ name: '', email: '', phone: '', subject: 'General Inquiry', message: '' });
-  };
-
   return (
-    <div className="pt-24 pb-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-16">
-          <span className="text-[#00f3ff] font-bold uppercase tracking-widest text-sm mb-4 block">Contact Us</span>
-          <h1 className="text-5xl md:text-7xl font-black italic">GET IN <span className="text-[#00f3ff]">TOUCH</span></h1>
+    <div className="pt-32 pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-h-screen">
+      <div className="text-center mb-24">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full mb-6">
+           <div className="w-1.5 h-1.5 rounded-full bg-accent animate-ping" />
+           <span className="text-[9px] font-black uppercase tracking-[0.3em] text-foreground/50">Global Communications Uplink</span>
         </div>
+        <h1 className="text-5xl md:text-8xl font-black italic tracking-tighter mb-8 uppercase leading-none text-white">
+          Establish <span className="text-accent">Contact</span>
+        </h1>
+        <p className="text-foreground/40 text-lg max-w-2xl mx-auto font-medium leading-relaxed uppercase tracking-tight">
+          Initiate a secure session with our elite acquisition specialists and technical advisors.
+        </p>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          {/* Info Side */}
-          <div className="space-y-6">
-            <div className="glass-card p-8 rounded-3xl space-y-8">
-              <div className="flex items-start gap-4">
-                <div className="p-4 bg-[#00f3ff]/10 rounded-2xl text-[#00f3ff]">
-                  <Phone className="w-6 h-6" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        {/* Contact Info */}
+        <div className="lg:col-span-1 space-y-8">
+          <div className="glass-card p-10 rounded-[3rem] border-white/5 bg-white/[0.02] relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+               <Phone className="w-32 h-32" />
+            </div>
+            <div className="relative z-10 space-y-10">
+              <div className="flex gap-6">
+                <div className="p-4 bg-accent/10 rounded-2xl text-accent border border-accent/20">
+                   <Phone size={24} />
                 </div>
                 <div>
-                  <h4 className="text-gray-500 font-bold uppercase tracking-wider text-xs mb-1">Phone</h4>
-                  <p className="text-xl font-bold">+1 (555) TIVORA-88</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-1">Direct Line</p>
+                  <p className="text-xl font-bold text-white tracking-tight">+1 (555) TIVORA-8</p>
                 </div>
               </div>
-              <div className="flex items-start gap-4">
-                <div className="p-4 bg-[#00f3ff]/10 rounded-2xl text-[#00f3ff]">
-                  <Mail className="w-6 h-6" />
+              <div className="flex gap-6">
+                <div className="p-4 bg-accent/10 rounded-2xl text-accent border border-accent/20">
+                   <Mail size={24} />
                 </div>
                 <div>
-                  <h4 className="text-gray-500 font-bold uppercase tracking-wider text-xs mb-1">Email</h4>
-                  <p className="text-xl font-bold">sales@tivorarides.com</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-1">Data Uplink</p>
+                  <p className="text-xl font-bold text-white tracking-tight">ops@tivoramotors.com</p>
                 </div>
               </div>
-              <div className="flex items-start gap-4">
-                <div className="p-4 bg-[#00f3ff]/10 rounded-2xl text-[#00f3ff]">
-                  <MapPin className="w-6 h-6" />
+              <div className="flex gap-6">
+                <div className="p-4 bg-accent/10 rounded-2xl text-accent border border-accent/20">
+                   <MapPin size={24} />
                 </div>
                 <div>
-                  <h4 className="text-gray-500 font-bold uppercase tracking-wider text-xs mb-1">Office</h4>
-                  <p className="text-xl font-bold">123 Speed Way, Miami, FL 33101</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-1">Sector Origin</p>
+                  <p className="text-xl font-bold text-white tracking-tight">Beverly Hills, CA</p>
                 </div>
               </div>
             </div>
-
-            <button className="w-full bg-[#25D366] text-white font-bold py-6 rounded-3xl flex items-center justify-center gap-3 hover:bg-[#128C7E] transition-colors shadow-lg shadow-[#25D366]/20">
-              <MessageCircle className="w-6 h-6" /> Quick Chat on WhatsApp
-            </button>
           </div>
 
-          {/* Form Side */}
-          <div className="lg:col-span-2">
-            <form onSubmit={handleSubmit} className="glass-card p-8 md:p-12 rounded-[2rem] space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase text-gray-500 tracking-widest ml-1">Full Name</label>
-                  <input
-                    required
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-4 px-6 focus:outline-none focus:border-[#00f3ff] transition-colors"
-                    placeholder="John Doe"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase text-gray-500 tracking-widest ml-1">Email Address</label>
-                  <input
-                    required
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-4 px-6 focus:outline-none focus:border-[#00f3ff] transition-colors"
-                    placeholder="john@example.com"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase text-gray-500 tracking-widest ml-1">Phone Number</label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-4 px-6 focus:outline-none focus:border-[#00f3ff] transition-colors"
-                    placeholder="+1 (000) 000-0000"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase text-gray-500 tracking-widest ml-1">Inquiry Type</label>
-                  <select
-                    value={formData.subject}
-                    onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-4 px-6 focus:outline-none focus:border-[#00f3ff] transition-colors appearance-none"
-                  >
-                    <option className="bg-[#111]">General Inquiry</option>
-                    <option className="bg-[#111]">Vehicle Appraisal</option>
-                    <option className="bg-[#111]">Financing Options</option>
-                    <option className="bg-[#111]">Service Appointment</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-gray-500 tracking-widest ml-1">Your Message</label>
-                <textarea
-                  required
-                  rows={6}
-                  value={formData.message}
-                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-4 px-6 focus:outline-none focus:border-[#00f3ff] transition-colors resize-none"
-                  placeholder="Tell us about the vehicle you're interested in..."
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-[#00f3ff] hover:bg-white hover:text-black text-black font-black py-5 rounded-xl flex items-center justify-center gap-3 transition-all transform active:scale-95 uppercase tracking-widest"
-              >
-                Send Message <Send className="w-5 h-5" />
-              </button>
-            </form>
+          <div className="glass-card p-10 rounded-[3rem] border-white/5 bg-[#00f2ff]/5 border-l-4 border-l-accent">
+             <Shield className="text-accent mb-6 w-10 h-10" />
+             <h3 className="text-xl font-black text-white uppercase italic tracking-tighter mb-4">Encrypted Channel</h3>
+             <p className="text-gray-500 text-xs font-black uppercase tracking-widest leading-relaxed">All communications are synchronized through our secure neural matrix ensuring absolute client confidentiality.</p>
           </div>
         </div>
 
-        <div className="mt-20 rounded-[3rem] overflow-hidden grayscale hover:grayscale-0 transition-all duration-1000 h-[400px]">
-          {/* Mock Map iframe - In a real app use Google Maps SDK */}
-          <iframe
-            title="Office Location"
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d114964.53925925016!2d-80.29949821868453!3d25.782390733066467!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x88d9b0a392760fd7%3A0xedc9330017c4da79!2sMiami%2C%20FL!5e0!3m2!1sen!2sus!4v1714578121644!5m2!1sen!2sus"
-            className="w-full h-full border-none"
-            loading="lazy"
-          ></iframe>
+        {/* Form */}
+        <div className="lg:col-span-2">
+          <div className="glass-card p-10 sm:p-12 rounded-[3rem] border-white/5 bg-white/[0.01]">
+            <form className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.3em] text-foreground/30 px-1">Subject Identity</label>
+                  <input type="text" placeholder="YOUR FULL NAME" className="w-full bg-white/5 border border-white/10 rounded-2xl py-6 px-8 text-xs font-bold text-white focus:outline-none focus:border-accent transition-all uppercase placeholder:text-white/5" />
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.3em] text-foreground/30 px-1">Network Node</label>
+                  <input type="email" placeholder="YOUR EMAIL ADDRESS" className="w-full bg-white/5 border border-white/10 rounded-2xl py-6 px-8 text-xs font-bold text-white focus:outline-none focus:border-accent transition-all uppercase placeholder:text-white/5" />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-[0.3em] text-foreground/30 px-1">Inquiry Protocol</label>
+                <select className="w-full bg-white/5 border border-white/10 rounded-2xl py-6 px-8 text-xs font-bold text-white focus:outline-none focus:border-accent transition-all uppercase appearance-none">
+                  <option className="bg-black">Asset Acquisition</option>
+                  <option className="bg-black">Bespoke Search Request</option>
+                  <option className="bg-black">Fleet Consignment</option>
+                  <option className="bg-black">Technical Support</option>
+                </select>
+              </div>
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-[0.3em] text-foreground/30 px-1">Detailed Transmission</label>
+                <textarea rows={6} placeholder="INITIATE MESSAGE DATA..." className="w-full bg-white/5 border border-white/10 rounded-3xl py-6 px-8 text-xs font-bold text-white focus:outline-none focus:border-accent transition-all uppercase resize-none placeholder:text-white/5"></textarea>
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-accent hover:bg-white hover:text-black text-black font-black py-6 rounded-3xl flex items-center justify-center gap-4 transition-all transform active:scale-[0.98] uppercase tracking-[0.2em] text-xs shadow-xl shadow-accent/10"
+              >
+                <Send size={18} /> Transmit Query Sequence
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
