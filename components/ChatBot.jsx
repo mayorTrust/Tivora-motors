@@ -2,11 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, Send, X, Bot, User, Loader2, Sparkles, Activity } from 'lucide-react';
 import gsap from 'gsap';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GEMINI_API_KEY } from '../lib/firebase';
 
-const genAI = new GoogleGenerativeAI("AIzaSyDXR-6wyPIbWK7A_iGQt6t2Juy2PJ8b3s4");
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-const ChatBot = ({ vehicles }) => {
-  const [isOpen, setIsOpen] = useState(false);
+const ChatBot = ({ vehicles, isOpen, setIsOpen }) => {
   const [messages, setMessages] = useState([
     { role: 'assistant', content: 'CIPHER OS Online. Accessing Tivora intelligence matrix. How can I assist your operation today?' }
   ]);
@@ -39,7 +39,8 @@ const ChatBot = ({ vehicles }) => {
     setIsLoading(true);
 
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      // Primary attempt with 3.1 Lite
+      let model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
       
       const context = `You are 'CIPHER', the elite AI operating system for Tivora Motors. 
       You have real-time access to the inventory: ${JSON.stringify(vehicles.map(v => ({ name: v.name, brand: v.brand, price: v.price, category: v.category, location: v.location })))}.
@@ -47,13 +48,27 @@ const ChatBot = ({ vehicles }) => {
       Keep responses concise. Use text only. If the inventory is empty, acknowledge it professionally.`;
 
       const prompt = `${context}\n\nUser: ${input}\nAssistant:`;
-      const result = await model.generateContent(prompt);
+      
+      let result;
+      try {
+        result = await model.generateContent(prompt);
+      } catch (e) {
+        console.warn("3.1-lite uplink failed, falling back to 2.5-lite...");
+        model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+        result = await model.generateContent(prompt);
+      }
+
       const response = await result.response;
       const text = response.text();
 
       setMessages(prev => [...prev, { role: 'assistant', content: text }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "Intelligence uplink interrupted. Please check your connection." }]);
+      console.error("CIPHER OS Error:", error);
+      const isBlocked = error.message?.includes('403');
+      const errorMsg = isBlocked 
+        ? "Intelligence uplink blocked. Please ensure the 'Generative Language API' is enabled for this key."
+        : "Intelligence uplink interrupted. Please check your network protocol.";
+      setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
     } finally {
       setIsLoading(false);
     }

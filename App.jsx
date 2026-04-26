@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate, Link } from 'react-router-dom';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
@@ -16,6 +16,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup'; 
 import UserDashboard from './pages/UserDashboard'; 
 import VoiceControl from './components/VoiceControl';
+import AudioPermissionModal from './components/AudioPermissionModal';
 import ChatBot from './components/ChatBot';
 import ActivityTicker from './components/ActivityTicker';
 import Logo from './components/Logo.jsx';
@@ -66,8 +67,14 @@ const AdminRoute = ({ vehicles, onAdd, onUpdate, onDelete }) => {
 
 const App = () => {
   const [loading, setLoading] = useState(true);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isCmdOpen, setIsCmdOpen] = useState(false);
+  const [isPermissionGranted, setIsPermissionGranted] = useState(false);
   const [vehicles, setVehicles] = useState([]);
+  
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Listen to Firestore
@@ -112,7 +119,33 @@ const App = () => {
     }
   };
 
+  const handleLoadingComplete = React.useCallback(() => {
+    setLoading(false);
+    setTimeout(() => {
+      setShowPermissionModal(true);
+    }, 500);
+  }, []);
+
+  const toggleTheme = React.useCallback(() => {
+    document.body.classList.toggle('light-mode');
+  }, []);
+
+  const handleCmdNavigate = React.useCallback((section) => {
+    switch(section) {
+      case 'home': navigate('/'); break;
+      case 'work': navigate('/inventory'); break;
+      case 'about': navigate('/about'); break;
+      case 'contact': navigate('/contact'); break;
+      case 'resume': navigate('/dashboard'); break;
+      case 'archive': navigate('/inventory'); break;
+      default: navigate('/');
+    }
+  }, [navigate]);
+
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
+
+  const handleOpenChat = React.useCallback(() => setIsChatOpen(true), []);
+  const handleOpenCmd = React.useCallback(() => setIsCmdOpen(true), []);
 
   return (
     <>
@@ -120,7 +153,7 @@ const App = () => {
       <Cursor />
       
       {loading ? (
-        <LoadingScreen onComplete={() => setLoading(false)} />
+        <LoadingScreen onComplete={handleLoadingComplete} />
       ) : (
         <div className="opacity-100 transition-opacity duration-1000">
           <AuthProvider>
@@ -142,10 +175,24 @@ const App = () => {
                         <Route path="/cart" element={<Cart />} />
                       </Routes>
                   </PageTransition>
-                </main>          
-                <VoiceControl vehicles={vehicles} />
-                <ChatBot vehicles={vehicles} />
-                <ActivityTicker />
+                  </main>          
+                  <VoiceControl 
+                    onNavigate={handleCmdNavigate} 
+                    onToggleTheme={toggleTheme}
+                    onOpenChat={handleOpenChat}
+                    onOpenCmd={handleOpenCmd}
+                    isPermissionGranted={isPermissionGranted}
+                  />
+                  <AudioPermissionModal 
+                    isOpen={showPermissionModal} 
+                    onClose={() => {
+                      setShowPermissionModal(false);
+                      setIsPermissionGranted(true);
+                    }} 
+                  />
+                  <ChatBot vehicles={vehicles} isOpen={isChatOpen} setIsOpen={setIsChatOpen} />
+                  <ActivityTicker />
+
                 {!isAuthPage && <Footer />}
               </div>
             </CartProvider>

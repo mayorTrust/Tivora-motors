@@ -1,300 +1,426 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Mic, MicOff, Volume2, VolumeX, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { Mic, MicOff, Zap, Mic2, Navigation, Command, Search as SearchIcon, Sparkles, Globe, Cpu, Languages, Terminal, MessageSquare, Send, X, Trash2, Heart, GitCompareArrows } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import gsap from 'gsap';
+import { GEMINI_API_KEY } from '../lib/firebase';
 
-const HINTS = [
-  "Ciphar, search for red cars in the vault",
-  "Ciphar, what is the best luxury bike available?",
-  "Ciphar, route me to the showroom",
-  "Ciphar, add the Porsche to my personal vault",
-  "Ciphar, calculate a 5-year loan for the Ferrari",
-  "Ciphar, initiate a side-by-side technical analysis",
-  "Ciphar, scroll down to see more assets",
-  "Ciphar, explain the specs in a sophisticated tone"
-];
-
-const VoiceControl = ({ vehicles = [] }) => {
+const VoiceControl = ({ 
+  onNavigate, 
+  onToggleTheme, 
+  onOpenChat,
+  onOpenCmd,
+  isPermissionGranted
+}) => {
+  const [status, setStatus] = useState('offline'); // offline, connecting, listening, speaking
   const [isActive, setIsActive] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const [inputText, setInputText] = useState('');
-  const [status, setStatus] = useState('idle');
-  const [lastCommand, setLastCommand] = useState(null);
+  const isAutoWelcomeStarted = useRef(false);
 
-  const navigate = useNavigate();
-  const chatScrollRef = useRef(null);
+  useEffect(() => {
+    if (isPermissionGranted && !isActive && !isAutoWelcomeStarted.current) {
+      const handleFirstInteraction = () => {
+        if (!isAutoWelcomeStarted.current) {
+          isAutoWelcomeStarted.current = true;
+          setIsActive(true);
+          startSession('welcome');
+          window.removeEventListener('click', handleFirstInteraction);
+          window.removeEventListener('keydown', handleFirstInteraction);
+        }
+      };
+      window.addEventListener('click', handleFirstInteraction);
+      window.addEventListener('keydown', handleFirstInteraction);
+      return () => {
+        window.removeEventListener('click', handleFirstInteraction);
+        window.removeEventListener('keydown', handleFirstInteraction);
+      };
+    }
+  }, [isPermissionGranted, isActive]);
+
+  // Audio Refs
+  const audioContextRef = useRef(null);
+  const inputContextRef = useRef(null);
+  const streamRef = useRef(null);
+  const sourceRef = useRef(null);
+  const processorRef = useRef(null);
+  const outputContextRef = useRef(null);
+  const nextStartTimeRef = useRef(0);
   
-  // Speech API Refs
-  const recognitionRef = useRef(null);
-  const synthRef = useRef(window.speechSynthesis);
+  // Gemini Refs
+  const sessionRef = useRef(null);
 
-  useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+  // Initialize Audio Contexts
+  const initAudio = async () => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      outputContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+      nextStartTimeRef.current = outputContextRef.current.currentTime;
     }
-  }, [messages]);
-
-  useEffect(() => {
-    // Initialize Web Speech API
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
-
-      recognition.onstart = () => {
-        setStatus('listening');
-        setIsActive(true);
-      };
-
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        handleSendMessage(transcript);
-      };
-
-      recognition.onerror = (event) => {
-        console.error("Speech Recognition Error:", event.error);
-        stopSession();
-      };
-
-      recognition.onend = () => {
-        setIsActive(false);
-        if (status === 'listening') setStatus('idle');
-      };
-
-      recognitionRef.current = recognition;
-    }
-
-    return () => {
-      if (recognitionRef.current) recognitionRef.current.stop();
-      if (synthRef.current) synthRef.current.cancel();
-    };
-  }, [status]);
-
-  const speak = (text) => {
-    if (!synthRef.current) return;
-    synthRef.current.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.1;
-    utterance.pitch = 0.9;
     
-    // Find a nice voice if available
-    const voices = synthRef.current.getVoices();
-    const refinedVoice = voices.find(v => v.name.includes('Google') || v.name.includes('Female')) || voices[0];
-    if (refinedVoice) utterance.voice = refinedVoice;
-
-    utterance.onstart = () => setStatus('speaking');
-    utterance.onend = () => setStatus('idle');
-    synthRef.current.speak(utterance);
+    if (audioContextRef.current.state === 'suspended') {
+      await audioContextRef.current.resume();
+    }
+    if (outputContextRef.current.state === 'suspended') {
+      await outputContextRef.current.resume();
+    }
   };
 
-  const vehicleContext = vehicles.length > 0 
-    ? vehicles.map(v => `${v.id}: ${v.name} (${v.brand}, ${v.category}, $${v.price})`).join('\n')
-    : "The inventory vault is currently empty.";
-
-  const systemInstruction = `
-    Identity & Persona: 
-    - You are CIPHER (Cyber Intelligence Protocol & High-Efficiency Assistant Responder). 
-    - You are incredibly sophisticated, articulate, and fiercely loyal AI OS.
-    - Your knowledge of the TIVORA MOTORS inventory is absolute.
-    - Address the user as "sir" or "ma'am" with peak refinement.
-    - Keep responses concise for voice delivery.
-
-    DATABASE:
-    ${vehicleContext}
-
-    COMMANDS:
-    - If user asks to search/find, respond and then include [SEARCH:query] in your text.
-    - If user asks to navigate, include [NAVIGATE:route] in your text. Routes: /, /inventory, /about, /contact, /admin, /dashboard, /cart.
-    - If user asks to add to wishlist/favorites, include [WISHLIST:id:add].
-    - If user asks to compare, include [COMPARE:id1,id2].
-  `;
-
-  const handleSendMessage = async (text) => {
-    if (!text.trim()) return;
-    const userMsg = { role: 'user', content: text };
-    setMessages(prev => [...prev, userMsg]);
-    setStatus('processing');
+  const playAudio = async (base64String) => {
+    const ctx = outputContextRef.current;
+    if (!ctx) return;
 
     try {
-      const genAI = new GoogleGenerativeAI("AIzaSyDXR-6wyPIbWK7A_iGQt6t2Juy2PJ8b3s4");
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-      const prompt = `${systemInstruction}\n\nUser: ${text}\nAssistant:`;
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      let responseText = response.text();
-      
-      // Process custom tags
-      processAITags(responseText);
-      
-      // Strip tags for speaking
-      const speechText = responseText.replace(/\[.*?\]/g, '').trim();
-      
-      setMessages(prev => [...prev, { role: 'assistant', content: speechText }]);
-      speak(speechText);
-
-    } catch (error) {
-      console.error("CIPHER OS Error:", error);
-      const errorMsg = "Interface uplink unstable, sir. Please retry.";
-      setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
-      speak(errorMsg);
-    } finally {
-      if (status !== 'speaking') setStatus('idle');
-    }
-  };
-
-  const processAITags = (text) => {
-    const navMatch = text.match(/\[NAVIGATE:(.*?)\]/);
-    if (navMatch) {
-      const route = navMatch[1].trim();
-      setLastCommand({ text: `ROUTING TO ${route.toUpperCase()}`, icon: <Navigation size={14} /> });
-      navigate(route);
-    }
-
-    const searchMatch = text.match(/\[SEARCH:(.*?)\]/);
-    if (searchMatch) {
-      const query = searchMatch[1].trim();
-      setLastCommand({ text: `SCANNING FOR ${query.toUpperCase()}`, icon: <SearchIcon size={14} /> });
-      navigate(`/inventory?search=${encodeURIComponent(query)}`);
-    }
-
-    const wishlistMatch = text.match(/\[WISHLIST:(.*?):(.*?)\]/);
-    if (wishlistMatch) {
-       const id = wishlistMatch[1].trim();
-       const action = wishlistMatch[2].trim();
-       window.dispatchEvent(new CustomEvent('tivora-manage-wishlist', { detail: { id, action } }));
-       setLastCommand({ text: `VAULT UPDATED`, icon: <Heart size={14} /> });
-    }
-
-    const compareMatch = text.match(/\[COMPARE:(.*?)\]/);
-    if (compareMatch) {
-       const ids = compareMatch[1].split(',').map(id => id.trim());
-       window.dispatchEvent(new CustomEvent('tivora-compare-vehicles', { detail: { ids } }));
-       setLastCommand({ text: `ANALYSIS ACTIVE`, icon: <GitCompareArrows size={14} /> });
-    }
-
-    setTimeout(() => setLastCommand(null), 3000);
-  };
-
-  const startSession = () => {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.start();
-      } catch (e) {
-        recognitionRef.current.stop();
-        setTimeout(() => recognitionRef.current.start(), 100);
+      // 1. Decode Base64 to Binary
+      const binaryString = atob(base64String);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
       }
-    } else {
-      alert("Voice recognition not supported in this browser.");
+
+      // 2. Convert to Int16 then Float32
+      const dataInt16 = new Int16Array(bytes.buffer);
+      const float32Data = new Float32Array(dataInt16.length);
+      for (let i = 0; i < dataInt16.length; i++) {
+        float32Data[i] = dataInt16[i] / 32768.0;
+      }
+
+      // 3. Create a buffer and play it
+      const audioBuffer = ctx.createBuffer(1, float32Data.length, 24000);
+      audioBuffer.getChannelData(0).set(float32Data);
+      
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+      
+      // Ensure smooth playback
+      const startTime = Math.max(nextStartTimeRef.current, ctx.currentTime);
+      source.start(startTime);
+      nextStartTimeRef.current = startTime + audioBuffer.duration;
+      
+      setStatus('speaking');
+      source.onended = () => {
+        if (ctx.currentTime >= nextStartTimeRef.current - 0.1) {
+          setStatus('listening');
+        }
+      };
+    } catch (err) {
+      console.error('Playback Error:', err);
     }
+  };
+
+  const setupAudioInput = async (session) => {
+    if (!streamRef.current) return;
+    
+    const ctx = audioContextRef.current;
+    
+    // Modern AudioWorklet instead of deprecated ScriptProcessor
+    if (!isWorkletLoadedRef.current) {
+      const workletCode = `
+        class PCMProcessor extends AudioWorkletProcessor {
+          process(inputs, outputs, parameters) {
+            const input = inputs[0];
+            if (input.length > 0) {
+              const float32Data = input[0];
+              this.port.postMessage(float32Data);
+            }
+            return true;
+          }
+        }
+        registerProcessor('pcm-processor', PCMProcessor);
+      `;
+
+      const blob = new Blob([workletCode], { type: 'application/javascript' });
+      const workletUrl = URL.createObjectURL(blob);
+      await ctx.audioWorklet.addModule(workletUrl);
+      isWorkletLoadedRef.current = true;
+    }
+    
+    sourceRef.current = ctx.createMediaStreamSource(streamRef.current);
+    processorRef.current = new AudioWorkletNode(ctx, 'pcm-processor');
+    
+    processorRef.current.port.onmessage = (e) => {
+      // Only send if we are actively listening and setup is complete
+      if (session && session.readyState === WebSocket.OPEN && status === 'listening') {
+        const inputData = e.data;
+        const int16 = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          int16[i] = Math.max(-1, Math.min(1, inputData[i])) * 32767;
+        }
+        
+        const b64 = btoa(String.fromCharCode(...new Uint8Array(int16.buffer)));
+
+        session.send(JSON.stringify({
+          realtimeInput: {
+            mediaChunks: [{
+              mimeType: 'audio/pcm;rate=16000',
+              data: b64
+            }]
+          }
+        }));
+      }
+    };
+
+    sourceRef.current.connect(processorRef.current);
+    processorRef.current.connect(ctx.destination);
+  };
+
+  const startSession = async (mode = 'interactive') => {
+    setStatus('connecting');
+    try {
+      await initAudio();
+      
+      streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
+      const ws = new WebSocket(url);
+      sessionRef.current = ws;
+
+      ws.onopen = async () => {
+        // Send setup message
+        const setup = {
+          setup: {
+            model: 'models/gemini-2.0-flash-exp',
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+              speechConfig: {
+                voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }
+              }
+            },
+            systemInstruction: {
+              parts: [{ text: `You are CIPHER OS, the high-tech AI interface for Tivora Motors. You are sleek, professional, and efficient. 
+              You can control the interface using tools.
+              Site Structure:
+              - Home: Featured luxury vehicles and brand highlights.
+              - Inventory (or Showroom): The full list of available vehicles.
+              - About: Our mission and legacy.
+              - Contact: Get in touch.
+              - Dashboard: User profile and saved vehicles.
+              - Cart: The checkout area for vehicle reservations.
+              
+              Navigation Logic:
+              - If the user says 'showroom', 'cars', or 'stock', navigate to 'inventory'.
+              - If they say 'profile' or 'account', navigate to 'dashboard'.
+              - If they want to see their saved cars or purchases, navigate to 'cart'.
+              
+              Behavior:
+              - Be concise.
+              - Use futuristic, automotive terminology.
+              ${mode === 'welcome' ? 'This is a secure link initialization. Greet the user with "Secure link established. CIPHER OS online." and invite them to explore the showroom.' : ''}` }]
+            },
+            tools: [{
+              functionDeclarations: [
+                {
+                  name: "navigate",
+                  description: "Navigate to different sections of the website",
+                  parameters: {
+                    type: "OBJECT",
+                    properties: {
+                      section: { type: "STRING", enum: ["home", "inventory", "about", "contact", "dashboard", "cart"] }
+                    },
+                    required: ["section"]
+                  }
+                },
+                {
+                  name: "toggle_theme",
+                  description: "Toggle between light and dark mode"
+                },
+                {
+                  name: "open_assistant",
+                  description: "Open the text-based AI chat assistant"
+                }
+              ]
+            }]
+          }
+        };
+        ws.send(JSON.stringify(setup));
+        
+        // Wait for setup to be acknowledged by the server before setting status to listening
+        setTimeout(() => {
+          setStatus('listening');
+        }, 500);
+
+        await setupAudioInput(ws);
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          let data = event.data;
+          if (data instanceof Blob) {
+            data = await data.text();
+          }
+          const response = JSON.parse(data);
+          
+          if (response.serverContent?.modelTurn?.parts) {
+            const parts = response.serverContent.modelTurn.parts;
+            for (const part of parts) {
+              if (part.inlineData) {
+                await playAudio(part.inlineData.data);
+              }
+              if (part.functionCall) {
+                handleToolCall(part.functionCall, ws);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Message Parsing Error:', err, event.data);
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.error('WS Error:', err);
+        setStatus('offline');
+      };
+
+      ws.onclose = () => {
+        setStatus('offline');
+        setIsActive(false);
+      };
+
+    } catch (err) {
+      console.error('Failed to start session:', err);
+      setStatus('offline');
+    }
+  };
+
+  const handleToolCall = (call, ws) => {
+    const { name, args } = call;
+    let result = { success: true };
+
+    switch (name) {
+      case 'navigate':
+        onNavigate(args.section);
+        break;
+      case 'toggle_theme':
+        onToggleTheme();
+        break;
+      case 'open_assistant':
+        onOpenChat();
+        break;
+      default:
+        result = { error: 'Unknown tool' };
+    }
+
+    // Send tool response back
+    ws.send(JSON.stringify({
+      tool_response: {
+        function_responses: [{
+          name,
+          response: { result }
+        }]
+      }
+    }));
   };
 
   const stopSession = () => {
-    if (recognitionRef.current) recognitionRef.current.stop();
-    setIsActive(false);
-    setStatus('idle');
+    if (sessionRef.current) {
+      sessionRef.current.close();
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+    }
+    if (sourceRef.current) {
+      sourceRef.current.disconnect();
+    }
+    setStatus('offline');
+  };
+
+  const toggleVoice = () => {
+    if (isActive) {
+      stopSession();
+      setIsActive(false);
+    } else {
+      isAutoWelcomeStarted.current = true; // Prevent auto-welcome from triggering if manually started
+      setIsActive(true);
+      startSession();
+    }
   };
 
   return (
-    <>
-      <div className="fixed bottom-8 right-28 z-50 flex flex-col items-end gap-4">
-        {lastCommand && (
-           <div className="bg-[#00f2ff] text-black px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest animate-in slide-in-from-right fade-in duration-300 shadow-xl flex items-center gap-3 border border-white/10">
-               {lastCommand.icon} {lastCommand.text}
-           </div>
+    <div className="fixed bottom-24 right-8 z-[60] flex flex-col items-end gap-3 pointer-events-none">
+      <AnimatePresence>
+        {isActive && (
+          <motion.div
+            initial={{ opacity: 0, x: 20, y: 10 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="bg-[#030303]/95 backdrop-blur-3xl border border-white/10 p-5 rounded-[2.5rem] shadow-[0_0_100px_rgba(0,0,0,1)] min-w-[250px] pointer-events-auto ring-1 ring-white/20"
+          >
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex gap-1.5 h-6 items-center">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <motion.div
+                    key={i}
+                    animate={status === 'speaking' || status === 'listening' ? {
+                      height: [4, 24, 8, 18, 4],
+                      backgroundColor: status === 'speaking' ? '#ffffff' : '#10b981'
+                    } : { height: 4, backgroundColor: '#333333' }}
+                    transition={{
+                      repeat: Infinity,
+                      duration: 0.8,
+                      delay: i * 0.1,
+                      ease: "easeInOut"
+                    }}
+                    className="w-1 rounded-full"
+                  />
+                ))}
+              </div>
+              <div className="flex flex-col">
+                <p className="text-[10px] font-mono text-white/40 uppercase tracking-[0.3em] leading-none mb-1">
+                  Cipher OS
+                </p>
+                <p className="text-[14px] font-black text-white uppercase tracking-tighter leading-none italic">
+                  {status === 'connecting' ? 'Establishing...' : 
+                   status === 'listening' ? 'Secure Link' : 
+                   status === 'speaking' ? 'Transmitting' : 'Standby'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-medium text-white/80">
+                  {status === 'connecting' ? 'Neural handshake in progress' :
+                   status === 'listening' ? 'Awaiting voice command' :
+                   status === 'speaking' ? 'Data stream active' : 'Link offline'}
+                </p>
+                <div className={`w-2 h-2 rounded-full ${status === 'listening' ? 'bg-emerald-500 shadow-[0_0_100px_#10b981]' : 'bg-white/10'}`} />
+              </div>
+              <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+              <div className="flex justify-between items-center text-[9px] font-mono text-white/30 uppercase tracking-widest">
+                <span>Model: Kore-v2.5</span>
+                <span className="flex items-center gap-1">
+                  <span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" />
+                  Live
+                </span>
+              </div>
+            </div>
+          </motion.div>
         )}
+      </AnimatePresence>
 
-        <div className="flex gap-4">
-            <button 
-                onClick={() => setIsChatOpen(true)}
-                className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white hover:border-[#00f2ff]/50 transition-all shadow-2xl backdrop-blur-xl group"
-                title="CIPHER Chat"
-            >
-                <MessageSquare size={24} className="group-hover:text-[#00f2ff] transition-colors" />
-            </button>
-            <button 
-                onClick={isActive ? stopSession : startSession} 
-                className={`relative z-10 w-14 h-14 rounded-2xl border border-white/10 flex items-center justify-center transition-all duration-500 ${isActive ? 'bg-[#00f2ff] text-black scale-110 shadow-[0_0_40px_rgba(0,242,255,0.4)]' : 'bg-white/5 text-gray-400 hover:text-white hover:border-[#00f2ff]/50 backdrop-blur-xl'}`}
-                title="CIPHER Voice"
-            >
-              {isActive ? <Mic2 size={24} className="animate-pulse" /> : <Mic size={24} />}
-            </button>
-        </div>
-      </div>
-
-      {isChatOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/95 backdrop-blur-2xl p-4">
-          <div className="relative w-full max-w-4xl h-[85vh] glass-card rounded-[3rem] border border-white/5 overflow-hidden flex flex-col bg-background/50">
-            <div className="p-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-              <div className="flex items-center gap-5">
-                <div className="w-14 h-14 rounded-3xl bg-[#00f2ff]/10 flex items-center justify-center border border-[#00f2ff]/20">
-                  <Cpu className="text-[#00f2ff] w-7 h-7" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-black tracking-tighter text-white uppercase italic">CIPHER <span className="text-[#00f2ff]">OS</span></h2>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-1.5 h-1.5 rounded-full ${status === 'idle' ? 'bg-gray-700' : 'bg-[#00f2ff] animate-ping'}`} />
-                    <span className="text-[10px] uppercase tracking-[0.3em] font-black text-white/30">{status} Protocol</span>
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => setIsChatOpen(false)} className="p-4 bg-white/5 hover:bg-white/10 rounded-full transition-all text-white/40 hover:text-white">
-                <X size={24} />
-              </button>
-            </div>
-
-            <div ref={chatScrollRef} className="flex-grow overflow-y-auto p-10 space-y-8 custom-scrollbar pr-6">
-              {messages.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center text-center space-y-6 opacity-20">
-                  <Sparkles size={64} className="text-[#00f2ff]" />
-                  <p className="text-[10px] uppercase tracking-[0.5em] font-black max-w-sm leading-relaxed text-white">Neural interface established. Initiate query sequence for inventory or technical specifications.</p>
-                </div>
-              )}
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in duration-500`}>
-                  <div className={`max-w-[80%] p-8 rounded-[2.5rem] text-xs font-medium leading-relaxed ${msg.role === 'user' ? 'bg-[#00f2ff] text-black shadow-2xl rounded-tr-none' : 'bg-white/5 text-white/70 border border-white/5 rounded-tl-none'}`}>
-                    {msg.content}
-                  </div>
-                </div>
-              ))}
-              {status === 'processing' && (
-                <div className="flex justify-start">
-                  <div className="bg-white/5 p-6 rounded-3xl rounded-tl-none border border-white/5 flex gap-2">
-                    <div className="w-1.5 h-1.5 bg-[#00f2ff] rounded-full animate-bounce" />
-                    <div className="w-1.5 h-1.5 bg-[#00f2ff] rounded-full animate-bounce [animation-delay:0.2s]" />
-                    <div className="w-1.5 h-1.5 bg-[#00f2ff] rounded-full animate-bounce [animation-delay:0.4s]" />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="p-10 border-t border-white/5 bg-white/[0.01]">
-              <div className="relative flex items-center">
-                <input 
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(inputText)}
-                  placeholder="CONSULT CIPHER MATRIX..."
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-6 px-8 text-xs font-black tracking-[0.2em] text-white focus:outline-none focus:border-[#00f2ff]/50 transition-all uppercase placeholder:text-white/5"
-                />
-                <button 
-                  onClick={() => handleSendMessage(inputText)}
-                  disabled={!inputText.trim() || status === 'processing'}
-                  className="absolute right-4 p-4 bg-[#00f2ff] text-black rounded-xl hover:scale-105 active:scale-95 disabled:opacity-50 transition-all shadow-xl"
-                >
-                  <Send size={20} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+      <motion.button
+        onClick={(e) => {
+          e.stopPropagation(); // Prevent triggering window-level auto-welcome
+          toggleVoice();
+        }}
+        whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(255,255,255,0.1)" }}
+        whileTap={{ scale: 0.95 }}
+        className={`pointer-events-auto p-4 rounded-full shadow-2xl transition-all duration-500 flex items-center justify-center border ring-1 ${
+          isActive 
+            ? 'bg-white border-white text-black ring-white/20' 
+            : 'bg-black/80 backdrop-blur-md border-white/10 text-white ring-white/5'
+        }`}
+      >
+        {status === 'connecting' ? (
+          <Loader2 className="animate-spin" size={24} />
+        ) : isActive ? (
+          status === 'speaking' ? <Volume2 size={24} /> : <Mic size={24} />
+        ) : (
+          <MicOff size={24} className="opacity-50" />
+        )}
+      </motion.button>
+    </div>
   );
 };
 
