@@ -8,7 +8,7 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 const ChatBot = ({ vehicles, isOpen, setIsOpen }) => {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'CIPHER OS Online. Accessing Tivora intelligence matrix. How can I assist your operation today?' }
+    { role: 'assistant', content: 'CIPHER Online. Accessing Tivora intelligence matrix. How can I assist your operation today?' }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -42,10 +42,12 @@ const ChatBot = ({ vehicles, isOpen, setIsOpen }) => {
       // Primary attempt with 3.1 Lite
       let model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
       
-      const context = `You are 'CIPHER', the elite AI operating system for Tivora Motors. 
-      You have real-time access to the inventory: ${JSON.stringify(vehicles.map(v => ({ name: v.name, brand: v.brand, price: v.price, category: v.category, location: v.location })))}.
-      Provide precise, data-driven insights with a sleek, professional, and slightly futuristic tone. 
-      Keep responses concise. Use text only. If the inventory is empty, acknowledge it professionally.`;
+      const context = `You are 'CIPHER', the elite AI assistant and master automotive intelligence for Tivora Motors. 
+      You have real-time access to the local inventory: ${JSON.stringify(vehicles.map(v => ({ name: v.name, brand: v.brand, price: v.price, category: v.category, location: v.location })))}.
+      Beyond the local stock, you possess exhaustive global knowledge of all automotive specifications, history, performance metrics, and industry trends.
+      You are authorized to answer any car-related queries, providing expert insights even for vehicles not currently in the Tivora collection.
+      If a user asks about a car not in stock, provide high-level data on that vehicle while suggesting relevant alternatives from the local inventory where appropriate.
+      Maintain a sleek, professional, and slightly futuristic tone. Keep responses concise. Use text only.`;
 
       const prompt = `${context}\n\nUser: ${input}\nAssistant:`;
       
@@ -63,7 +65,7 @@ const ChatBot = ({ vehicles, isOpen, setIsOpen }) => {
 
       setMessages(prev => [...prev, { role: 'assistant', content: text }]);
     } catch (error) {
-      console.error("CIPHER OS Error:", error);
+      console.error("CIPHER Error:", error);
       const isBlocked = error.message?.includes('403');
       const errorMsg = isBlocked 
         ? "Intelligence uplink blocked. Please ensure the 'Generative Language API' is enabled for this key."
@@ -88,7 +90,7 @@ const ChatBot = ({ vehicles, isOpen, setIsOpen }) => {
                 <Activity className="w-5 h-5 text-[#00f2ff]" />
               </div>
               <div>
-                <h4 className="text-sm font-black text-white tracking-tighter italic">CIPHER <span className="text-[#00f2ff]">OS</span></h4>
+                <h4 className="text-sm font-black text-white tracking-tighter italic">CIPHER</h4>
                 <div className="flex items-center gap-1.5">
                   <div className="w-1 h-1 rounded-full bg-[#00f2ff] animate-ping" />
                   <span className="text-[9px] text-gray-500 uppercase tracking-widest font-black">Secure Link Established</span>
@@ -153,7 +155,7 @@ const ChatBot = ({ vehicles, isOpen, setIsOpen }) => {
         <button 
           onClick={() => setIsOpen(true)}
           className="w-14 h-14 bg-[#00f2ff] text-black rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(0,242,255,0.3)] hover:scale-105 transition-all group border border-white/10"
-          title="CIPHER OS"
+          title="CIPHER"
         >
           <Activity className="w-7 h-7 group-hover:rotate-12 transition-transform" />
         </button>

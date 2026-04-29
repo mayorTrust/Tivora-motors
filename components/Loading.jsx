@@ -65,7 +65,7 @@ export const LoadingScreen = ({ onComplete }) => {
 
         <div className="absolute bottom-20 flex flex-col items-center z-20">
           <h1 className="text-2xl font-black tracking-[1em] text-white/40 uppercase italic animate-pulse">
-            TIVORA <span className="text-accent">OS</span>
+            TIVORA
           </h1>
           <div className="mt-4 w-12 h-[1px] bg-[#00f2ff]/30" />
         </div>

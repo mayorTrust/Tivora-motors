@@ -15,8 +15,6 @@ import Admin from './pages/Admin';
 import Login from './pages/Login'; 
 import Signup from './pages/Signup'; 
 import UserDashboard from './pages/UserDashboard'; 
-import VoiceControl from './components/VoiceControl';
-import AudioPermissionModal from './components/AudioPermissionModal';
 import ChatBot from './components/ChatBot';
 import ActivityTicker from './components/ActivityTicker';
 import Logo from './components/Logo.jsx';
@@ -67,10 +65,8 @@ const AdminRoute = ({ vehicles, onAdd, onUpdate, onDelete }) => {
 
 const App = () => {
   const [loading, setLoading] = useState(true);
-  const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isCmdOpen, setIsCmdOpen] = useState(false);
-  const [isPermissionGranted, setIsPermissionGranted] = useState(false);
   const [vehicles, setVehicles] = useState([]);
   
   const location = useLocation();
@@ -121,9 +117,6 @@ const App = () => {
 
   const handleLoadingComplete = React.useCallback(() => {
     setLoading(false);
-    setTimeout(() => {
-      setShowPermissionModal(true);
-    }, 500);
   }, []);
 
   const toggleTheme = React.useCallback(() => {
@@ -176,20 +169,6 @@ const App = () => {
                       </Routes>
                   </PageTransition>
                   </main>          
-                  <VoiceControl 
-                    onNavigate={handleCmdNavigate} 
-                    onToggleTheme={toggleTheme}
-                    onOpenChat={handleOpenChat}
-                    onOpenCmd={handleOpenCmd}
-                    isPermissionGranted={isPermissionGranted}
-                  />
-                  <AudioPermissionModal 
-                    isOpen={showPermissionModal} 
-                    onClose={() => {
-                      setShowPermissionModal(false);
-                      setIsPermissionGranted(true);
-                    }} 
-                  />
                   <ChatBot vehicles={vehicles} isOpen={isChatOpen} setIsOpen={setIsChatOpen} />
                   <ActivityTicker />
 
