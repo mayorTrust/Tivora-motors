@@ -1,159 +1,78 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import gsap from 'gsap';
-import { animate, createDrawable, stagger, steps } from 'animejs';
 import LogoSVG from './LogoSVG';
 
 export const LoadingScreen = ({ onComplete }) => {
   const containerRef = useRef(null);
-  const logoWrapperRef = useRef(null);
-  const textRef = useRef(null);
-  const flareRef = useRef(null);
+  const videoRef = useRef(null);
+  const playCount = useRef(0);
+  const [videoSrc, setVideoSrc] = React.useState('');
 
   useEffect(() => {
-    const paths = document.querySelectorAll('.wire');
-    
-    // Initial State Setup - Using Cyan
-    gsap.set(containerRef.current, { backgroundColor: '#050505' });
-    gsap.set(paths, { stroke: '#00f2ff', strokeWidth: 2, fill: 'transparent', opacity: 0 });
-    gsap.set(textRef.current, { opacity: 0, y: 20, filter: 'blur(10px)' });
-    gsap.set(flareRef.current, { scale: 0, opacity: 0 });
-
-    // Master GSAP Timeline for cinematic coordination
-    const masterTl = gsap.timeline({
-      onComplete: () => {
-        // Smooth transition to website
-        const exitTl = gsap.timeline({
-          onComplete: onComplete
-        });
-
-        exitTl.to(logoWrapperRef.current, {
-          scale: 0.8,
-          opacity: 0,
-          duration: 0.8,
-          ease: "power4.in"
-        })
-        .to(containerRef.current, {
-          backgroundColor: 'transparent',
-          duration: 1,
-          ease: "power2.inOut"
-        }, "-=0.4")
-        .to(containerRef.current, {
-          opacity: 0,
-          duration: 0.8,
-          ease: "power2.inOut"
-        }, "-=0.6");
+    // Quality selection logic
+    const getAutoQuality = () => {
+      const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      const isDesktop = window.innerWidth >= 1024;
+      
+      if (connection) {
+        if (connection.saveData) return 'low';
+        const type = connection.effectiveType;
+        if (type === '4g') return isDesktop ? 'high' : 'mid';
+        return 'low';
       }
-    });
-
-    // PHASE 1: Wireframe Draw (using Anime.js v4) - Now Cyan
-    const drawables = createDrawable('.wire', 0, 0); 
-
-    const drawAnimation = animate(drawables, {
-      draw: '0 1', 
-      duration: 2000,
-      delay: stagger(20, {from: 'center'}),
-      ease: 'expo.out', 
-      onBegin: () => {
-        // High-energy flicker/glitch overlay during draw
-        gsap.to(paths, { 
-            opacity: () => Math.random() * 0.5 + 0.5, 
-            duration: 0.1, 
-            repeat: 20, 
-            yoyo: true 
-        });
-      }
-    });
-
-    // PHASE 2: Neon Pulsing (Cyan Bloom)
-    masterTl.to(paths, {
-        opacity: 1,
-        strokeWidth: 3,
-        filter: 'drop-shadow(0 0 15px #00f2ff) drop-shadow(0 0 30px #00f2ff)',
-        duration: 0.5,
-        delay: 2.2 
-    })
-    .to(paths, {
-        stroke: '#ffffff', 
-        filter: 'drop-shadow(0 0 25px #00f2ff) drop-shadow(0 0 50px #00f2ff)',
-        duration: 0.8,
-        repeat: 1,
-        yoyo: true,
-        ease: "sine.inOut"
-    })
-
-    // PHASE 3: Solidification & Branding
-    .to(flareRef.current, {
-        scale: 4,
-        opacity: 0.6,
-        duration: 1,
-        ease: "expo.out"
-    }, "-=0.5")
-    .to(paths, {
-        stroke: '#ffffff',
-        fill: 'rgba(0,242,255,0.05)',
-        filter: 'drop-shadow(0 0 5px #ffffff)',
-        duration: 1,
-        ease: "power2.out"
-    }, "-=0.5")
-    .to(textRef.current, {
-        opacity: 1,
-        y: 0,
-        filter: 'blur(0px)',
-        duration: 1.5,
-        ease: "expo.out"
-    }, "-=0.8")
-    .to(flareRef.current, {
-        opacity: 0,
-        duration: 1.5
-    }, "-=1")
-    
-    // Final hold before transition
-    .to({}, { duration: 1 });
-
-    return () => {
-      masterTl.kill();
-      if (drawAnimation && drawAnimation.stop) {
-        drawAnimation.stop();
-      }
+      return isDesktop ? 'high' : 'mid';
     };
-  }, [onComplete]);
+
+    const quality = getAutoQuality();
+    setVideoSrc(`/intros/logovid-${quality}.mp4`);
+
+    // Entrance Animation
+    gsap.fromTo(containerRef.current, 
+      { opacity: 0 }, 
+      { opacity: 1, duration: 1, ease: "power2.out" }
+    );
+  }, []);
+
+  const handleVideoEnded = () => {
+    // Cinematic Exit: Blur and Zoom into the screen
+    gsap.to(containerRef.current, {
+      opacity: 0,
+      scale: 1.5,
+      filter: "blur(20px)",
+      duration: 1.2,
+      ease: "power4.inOut",
+      onComplete: onComplete
+    });
+  };
 
   return (
     <div 
       ref={containerRef}
-      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#050505] overflow-hidden select-none"
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#050505] overflow-hidden"
     >
-      {/* Background Lens Flare / Reveal */}
-      <div 
-        ref={flareRef}
-        className="absolute w-64 h-64 rounded-full lens-flare pointer-events-none"
-      />
+      <div className="relative w-full h-full flex items-center justify-center">
+        {videoSrc && (
+          <video
+            ref={videoRef}
+            src={videoSrc}
+            autoPlay
+            muted
+            playsInline
+            onEnded={handleVideoEnded}
+            className="w-full h-full object-cover mix-blend-screen opacity-0 animate-[preloader-fade-in_1.5s_ease-out_forwards]"
+          />
+        )}
 
-      <div className="relative z-10 flex flex-col items-center">
-        {/* Logo Section - Wrappers removed to isolate logo */}
-        <LogoSVG 
-          ref={logoWrapperRef} 
-          className="w-64 h-64 md:w-80 md:h-80 mb-12" 
-        />
-
-        {/* Branding Section */}
-        <div ref={textRef} className="text-center">
-          <h1 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-[0.4em] sm:tracking-[0.8em] text-white uppercase mb-4 glitch-text">
-            TIVORA
+        <div className="absolute bottom-20 flex flex-col items-center z-20">
+          <h1 className="text-2xl font-black tracking-[1em] text-white/40 uppercase italic animate-pulse">
+            TIVORA <span className="text-accent">OS</span>
           </h1>
-          <div className="flex items-center justify-center gap-3 sm:gap-6 text-[#00f2ff] text-[10px] sm:text-[12px] tracking-[0.3em] sm:tracking-[0.5em] uppercase font-bold opacity-80">
-            <span className="hidden sm:block w-12 h-[1px] bg-[#00f2ff]/30" />
-            Motorsports Dynamics
-            <span className="hidden sm:block w-12 h-[1px] bg-[#00f2ff]/30" />
-          </div>
+          <div className="mt-4 w-12 h-[1px] bg-[#00f2ff]/30" />
         </div>
       </div>
-
-      {/* System Status HUD */}
-      <div className="absolute top-10 left-10 text-[10px] text-[#00f2ff]/20 font-mono tracking-widest uppercase pointer-events-none hidden md:block">
-        [SYS_STATUS]: BOOT_SEQUENCE_INIT<br/>
-        [LINK]: ESTABLISHED_CYAN_LINE
-      </div>
+      
+      {/* Decorative Scanline */}
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-accent/5 to-transparent h-1/2 w-full animate-scan opacity-20" />
     </div>
   );
 };
@@ -188,8 +107,6 @@ export const SkeletonCard = () => {
           <div className="skeleton h-12 rounded-lg bg-white/5"></div>
           <div className="skeleton h-12 rounded-lg bg-white/5"></div>
         </div>
-        <div className="skeleton h-4 w-full rounded-md bg-white/5"></div>
-        <div className="skeleton h-4 w-2/3 rounded-md bg-white/5"></div>
       </div>
     </div>
   );
@@ -197,38 +114,14 @@ export const SkeletonCard = () => {
 
 export const SkeletonDetails = () => {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 min-h-screen">
       <div className="skeleton h-6 w-32 rounded mb-8 bg-white/5"></div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        <div className="space-y-4">
-          <div className="skeleton aspect-video rounded-3xl bg-white/5"></div>
-          <div className="flex gap-4 overflow-hidden">
-            <div className="skeleton w-24 aspect-square rounded-xl bg-white/5"></div>
-            <div className="skeleton w-24 aspect-square rounded-xl bg-white/5"></div>
-            <div className="skeleton w-24 aspect-square rounded-xl bg-white/5"></div>
-          </div>
-        </div>
+        <div className="skeleton aspect-video rounded-3xl bg-white/5"></div>
         <div className="space-y-8">
-          <div>
-            <div className="skeleton h-4 w-20 rounded mb-4 bg-white/5"></div>
-            <div className="skeleton h-12 w-3/4 rounded mb-4 bg-white/5"></div>
-            <div className="skeleton h-8 w-1/3 rounded bg-white/5"></div>
-          </div>
-          <div className="grid grid-cols-4 gap-4">
-            <div className="skeleton h-20 rounded-2xl bg-white/5"></div>
-            <div className="skeleton h-20 rounded-2xl bg-white/5"></div>
-            <div className="skeleton h-20 rounded-2xl bg-white/5"></div>
-            <div className="skeleton h-20 rounded-2xl bg-white/5"></div>
-          </div>
-          <div className="space-y-4">
-            <div className="skeleton h-4 w-full rounded bg-white/5"></div>
-            <div className="skeleton h-4 w-full rounded bg-white/5"></div>
-            <div className="skeleton h-4 w-2/3 rounded bg-white/5"></div>
-          </div>
-          <div className="flex gap-4">
-            <div className="skeleton h-16 flex-1 rounded-2xl bg-white/5"></div>
-            <div className="skeleton h-16 flex-1 rounded-2xl bg-white/5"></div>
-          </div>
+          <div className="skeleton h-12 w-3/4 rounded bg-white/5"></div>
+          <div className="skeleton h-20 w-full rounded bg-white/5"></div>
+          <div className="skeleton h-32 w-full rounded bg-white/5"></div>
         </div>
       </div>
     </div>

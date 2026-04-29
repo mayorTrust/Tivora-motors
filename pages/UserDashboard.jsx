@@ -2,12 +2,12 @@ import React from 'react';
 import { useAuth } from '../hooks/useAuth.jsx';
 import { useWishlist } from '../hooks/useWishlist';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Mail, Shield, LogOut, Heart, GitCompareArrows, ArrowRight } from 'lucide-react';
+import { User, Mail, Shield, LogOut, Heart, GitCompareArrows, ArrowRight, Trash2 } from 'lucide-react';
 import VehicleCard from '../components/VehicleCard';
 
 const UserDashboard = ({ vehicles = [] }) => {
   const { user, logout } = useAuth();
-  const { wishlist } = useWishlist();
+  const { wishlist, clearWishlist } = useWishlist();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -25,12 +25,14 @@ const UserDashboard = ({ vehicles = [] }) => {
          </div>
         <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-4">Access <span className="text-accent">Denied</span></h2>
         <p className="text-foreground/50 mb-8 font-medium">Authentication required to access the secure vault.</p>
-        <Link to="/login" className="bg-accent text-background px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:scale-105 transition-all">
+        <Link to="/login" className="bg-accent text-black px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:scale-105 transition-all">
            Return to Login
         </Link>
       </div>
     );
   }
+
+  const displayName = user.displayName || user.email?.split('@')[0] || 'Operator';
 
   return (
     <div className="pt-32 pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-h-screen">
@@ -42,7 +44,7 @@ const UserDashboard = ({ vehicles = [] }) => {
             <span className="text-accent font-black uppercase tracking-[0.3em] text-xs">Command Center</span>
           </div>
           <h1 className="text-5xl md:text-8xl font-black italic tracking-tighter mb-4 uppercase leading-none text-foreground">
-            {user.username.split(' ')[0]}<span className="text-accent">'S</span> VAULT
+            {displayName.split(' ')[0]}<span className="text-accent">'S</span> VAULT
           </h1>
           <p className="text-foreground/60 text-lg max-w-xl">Manage your personalized collection and account settings.</p>
         </div>
@@ -70,7 +72,7 @@ const UserDashboard = ({ vehicles = [] }) => {
                 </div>
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-foreground/30">Identifier</p>
-                  <p className="font-bold text-foreground">{user.username}</p>
+                  <p className="font-bold text-foreground">{displayName}</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -107,11 +109,21 @@ const UserDashboard = ({ vehicles = [] }) => {
                <h3 className="text-2xl font-black uppercase italic tracking-tighter text-foreground flex items-center gap-3">
                   <Heart className="w-6 h-6 text-accent fill-accent" /> Saved <span className="text-accent">Assets</span>
                </h3>
-               {savedVehicles.length > 0 && (
-                 <Link to="/inventory" className="text-[10px] font-black uppercase tracking-widest text-foreground/40 hover:text-accent transition-colors flex items-center gap-2">
-                    Browse More <ArrowRight className="w-3 h-3" />
-                 </Link>
-               )}
+               <div className="flex items-center gap-6">
+                 {savedVehicles.length > 0 && (
+                   <button 
+                     onClick={() => { if(confirm("Purge all saved assets?")) clearWishlist(); }}
+                     className="text-[10px] font-black uppercase tracking-widest text-red-500/40 hover:text-red-500 transition-colors flex items-center gap-2"
+                   >
+                     <Trash2 className="w-3 h-3" /> Clear Matrix
+                   </button>
+                 )}
+                 {savedVehicles.length > 0 && (
+                   <Link to="/inventory" className="text-[10px] font-black uppercase tracking-widest text-foreground/40 hover:text-accent transition-colors flex items-center gap-2">
+                      Browse More <ArrowRight className="w-3 h-3" />
+                   </Link>
+                 )}
+               </div>
             </div>
 
             {savedVehicles.length > 0 ? (
