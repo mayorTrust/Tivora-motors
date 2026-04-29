@@ -20,6 +20,7 @@ const Navbar = ({ Logo }) => {
   }, []);
 
   const navLinks = [
+    { name: 'Home', path: '/' },
     { name: 'Showroom', path: '/inventory' },
     { name: 'Our Legacy', path: '/about' },
     { name: 'Intel', path: '/contact' },

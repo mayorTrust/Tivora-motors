@@ -4,50 +4,75 @@ import LogoSVG from './LogoSVG';
 
 export const LoadingScreen = ({ onComplete }) => {
   const containerRef = useRef(null);
-  const contentRef = useRef(null);
+  const videoRef = useRef(null);
+  const playCount = useRef(0);
+  const [videoSrc, setVideoSrc] = React.useState('');
 
   useEffect(() => {
-    const tl = gsap.timeline({
+    // Quality selection logic
+    const getAutoQuality = () => {
+      const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      const isDesktop = window.innerWidth >= 1024;
+      
+      if (connection) {
+        if (connection.saveData) return 'low';
+        const type = connection.effectiveType;
+        if (type === '4g') return isDesktop ? 'high' : 'mid';
+        return 'low';
+      }
+      return isDesktop ? 'high' : 'mid';
+    };
+
+    const quality = getAutoQuality();
+    setVideoSrc(`/intros/logovid-${quality}.mp4`);
+
+    // Entrance Animation
+    gsap.fromTo(containerRef.current, 
+      { opacity: 0 }, 
+      { opacity: 1, duration: 1, ease: "power2.out" }
+    );
+  }, []);
+
+  const handleVideoEnded = () => {
+    // Cinematic Exit: Blur and Zoom into the screen
+    gsap.to(containerRef.current, {
+      opacity: 0,
+      scale: 1.5,
+      filter: "blur(20px)",
+      duration: 1.2,
+      ease: "power4.inOut",
       onComplete: onComplete
     });
-
-    gsap.set(contentRef.current, { opacity: 0, scale: 0.9 });
-
-    tl.to(contentRef.current, {
-      opacity: 1,
-      scale: 1,
-      duration: 1.2,
-      ease: "power3.out",
-      delay: 0.5
-    })
-    .to(contentRef.current, {
-      opacity: 0,
-      scale: 1.05,
-      duration: 0.8,
-      ease: "power3.in",
-      delay: 1
-    })
-    .to(containerRef.current, {
-      opacity: 0,
-      duration: 0.5,
-      ease: "power2.inOut"
-    });
-
-    return () => tl.kill();
-  }, [onComplete]);
+  };
 
   return (
     <div 
       ref={containerRef}
       className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#050505] overflow-hidden"
     >
-      <div ref={contentRef} className="flex flex-col items-center">
-        <LogoSVG className="w-48 h-48 mb-8" />
-        <h1 className="text-4xl font-black tracking-[0.6em] text-white uppercase italic">
-          TIVORA
-        </h1>
-        <div className="mt-4 w-12 h-[1px] bg-[#00f2ff]" />
+      <div className="relative w-full h-full flex items-center justify-center">
+        {videoSrc && (
+          <video
+            ref={videoRef}
+            src={videoSrc}
+            autoPlay
+            muted
+            playsInline
+            onEnded={handleVideoEnded}
+            className="w-full h-full object-cover mix-blend-screen opacity-0 animate-[preloader-fade-in_1.5s_ease-out_forwards]"
+          />
+        )}
+
+        <div className="absolute bottom-20 flex flex-col items-center z-20">
+          <h1 className="text-2xl font-black tracking-[1em] text-white/40 uppercase italic animate-pulse">
+            TIVORA <span className="text-accent">OS</span>
+          </h1>
+          <div className="mt-4 w-12 h-[1px] bg-[#00f2ff]/30" />
+        </div>
       </div>
+      
+      {/* Decorative Scanline */}
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-accent/5 to-transparent h-1/2 w-full animate-scan opacity-20" />
     </div>
   );
 };
