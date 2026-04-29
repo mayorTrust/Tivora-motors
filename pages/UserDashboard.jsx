@@ -32,7 +32,7 @@ const UserDashboard = ({ vehicles = [] }) => {
     );
   }
 
-  const displayName = user.displayName || user.email?.split('@')[0] || 'Operator';
+  const displayName = user ? (user.displayName || user.email?.split('@')[0] || 'Operator') : 'Operator';
 
   return (
     <div className="pt-32 pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-h-screen">

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.jsx';
 import gsap from 'gsap';
-import { LogIn, Mail, Lock, ShieldCheck, ArrowRight, Chrome } from 'lucide-react';
+import { LogIn, Mail, Lock, ShieldCheck, ArrowRight, Chrome, Loader2 } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -25,14 +25,19 @@ const Login = () => {
     setError('');
     setIsSubmitting(true);
     
-    const result = await login(email, password);
-    if (result.success) {
-      navigate('/dashboard');
-    } else {
-      setError(result.error || 'Invalid credentials.');
-      gsap.fromTo(formRef.current, { x: -10 }, { x: 0, duration: 0.1, repeat: 5, yoyo: true });
+    try {
+      const result = await login(email, password);
+      if (result.success) {
+        navigate('/dashboard');
+      } else {
+        setError(result.error || 'Invalid credentials.');
+        gsap.fromTo(formRef.current, { x: -10 }, { x: 0, duration: 0.1, repeat: 5, yoyo: true });
+      }
+    } catch (err) {
+      setError('An unexpected error occurred.');
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   const handleGoogleLogin = async () => {
